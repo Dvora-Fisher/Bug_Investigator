@@ -1,0 +1,386 @@
+{
+  "experiment": "baseline-hard-927e30bd",
+  "mode": "baseline",
+  "finished_at": "2026-11-23T21:33:21.052633+00:00",
+  "scenarios": 5,
+  "total_spend_usd": 0.0228,
+  "summary": {
+    "bug_reproduced": 0.8,
+    "cost_usd": 0.0044,
+    "file_localization": 1.0,
+    "fix_success": 1.0,
+    "function_localization": 1.0,
+    "root_cause_accuracy": 1.0,
+    "tests_pass_after_fix": 1.0,
+    "unsupported_claim_rate": 0.0
+  },
+  "rows": [
+    {
+      "scenario": "py-hard-weekly-digest",
+      "language": "Python",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "digest/scheduler.py"
+        ],
+        "leading_file": "digest/preferences.py",
+        "leading_symbol": "",
+        "root_cause": "Day-number mismatch between two parts of the code. preferences.py stores digest_day as ISO weekday numbers (Monday=1 ... Sunday=7), and parse_day produces the same numbering. scheduler.due_users compares that stored value against now.weekday(), which is 0-based (Monday=0 ... Sunday=6). Users who chose Sunday (stored as 7) can never match, so they are silently dropped with no error. Every other user is also matched one day late (a Monday user is sent on Tuesday), which is why only some users appear to be missing.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: The user selection in scheduler or run excludes some users silently, for example by filtering on a preference flag or a missing field in users.py, so those users are never passed to the mailer and no error is raised.",
+            "evidence_ids": [
+              "E4",
+              "E7",
+              "E8"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: Day-number mismatch between two parts of the code. preferences.py stores digest_day as ISO weekday numbers (Monday=1 ... Sunday=7), and parse_day produces the same numbering. scheduler.due_users compares that stored value against now.weekday(), which is 0-based (Monday=0 ... Sunday=6). Users who chose Sunday (stored as 7) can never match, so they are silently dropped with no error. Every other user is also matched one day late (a Monday user is sent on Tuesday), which is why only some users appear to be missing.",
+            "evidence_ids": [
+              "E4",
+              "E7"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: Root cause is an off-by-one weekday mismatch, not the H1 preference filter. digest/scheduler.py due_users() compares now.weekday() (Monday=0..Sunday=6) with u.prefs.digest_day, which preferences.py documents and stores as ISO numbers (Monday=1..Sunday=7). A subscriber who chose Sunday has digest_day=7, which never equals any weekday() value, so they are silently dropped on every run. Non-Sunday users are shifted one day late (Monday subscribers get it on Tuesday). The repro script builds a Sunday subscriber from from_settings({\"day\": \"sunday\"}), calls due_users on Sunday 2024-06-09, and gets an empty list (prefs.digest_day = 7, now.weekday() = 6). Existing suite passes (E9) because test_wants_digest does not exercise the day comparison. Caveat: I did not confirm the exact set of \"some users\" in the report beyond Sunday subscribers, and I did not check whether a fix should convert to ISO via isoweekday().",
+            "evidence_ids": [
+              "E9",
+              "E11",
+              "E12",
+              "E13",
+              "E14"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 16,
+        "llm_calls": 11,
+        "cost_usd": 0.00432496,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00432
+      }
+    },
+    {
+      "scenario": "ts-hard-price-signature",
+      "language": "TypeScript",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "src/cart.ts",
+          "src/invoice.ts"
+        ],
+        "leading_file": "src/format.ts",
+        "leading_symbol": "formatPrice",
+        "root_cause": "In v2.0.0 formatPrice's signature changed to formatPrice(currency, amount) (CHANGELOG, src/format.ts line 4). The cart and invoice call sites still pass (amount, currency). So currency is the number and amount is the string code; SYMBOLS[number] is undefined, the fallback prints the amount as \"19.98 \" and Number(\"USD\") is NaN, producing \"19.98 NaN\". src/email.ts already uses the new order, which is why emails are correct.",
+        "reproduced": false,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: In src/cart.ts and src/invoice.ts, price formatting calls a shared helper in src/money.ts or src/format.ts with a changed signature (v2.0.0 likely reordered or renamed parameters, e.g. (amount, currency) vs (currency, amount)), so the currency symbol lookup returns undefined and the amount is rendered as a number followed by a NaN value from a failed numeric conversion of the currency code.",
+            "evidence_ids": [
+              "E1",
+              "E3",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H4 supported: src/cart.ts and src/invoice.ts still call formatPrice(amount, currency) after v2.0.0 changed its signature to formatPrice(currency, amount) in src/format.ts; the call-site argument order was not updated, so the currency lookup receives a number and the numeric conversion of the currency code yields NaN. Email uses the new order and is unaffected.",
+            "evidence_ids": [
+              "E12",
+              "E13",
+              "E14"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H5 supported: The invoice path has the same argument-order mismatch: src/invoice.ts line-item and total formatting calls formatPrice with (amount, currency), producing the same '19.98 NaN' pattern in PDF output. A shared fix must update all non-email callers together.",
+            "evidence_ids": [
+              "E13",
+              "E14"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: In v2.0.0 formatPrice's signature changed to formatPrice(currency, amount) (CHANGELOG, src/format.ts line 4). The cart and invoice call sites still pass (amount, currency). So currency is the number and amount is the string code; SYMBOLS[number] is undefined, the fallback prints the amount as \"19.98 \" and Number(\"USD\") is NaN, producing \"19.98 NaN\". src/email.ts already uses the new order, which is why emails are correct.",
+            "evidence_ids": [
+              "E1",
+              "E3",
+              "E20",
+              "E21"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 2,
+        "fix_attempts": 1,
+        "evidence_items": 22,
+        "llm_calls": 20,
+        "cost_usd": 0.00682255,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": null,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 0.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00682
+      }
+    },
+    {
+      "scenario": "ts-hard-cache-collision",
+      "language": "TypeScript",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "src/orders/orderService.ts"
+        ],
+        "leading_file": "src/cache/cache.ts",
+        "leading_symbol": "",
+        "root_cause": "The page cache key in OrderService.ordersPage is built by concatenating userId and page with no separator: `orders:${userId}${page}` (src/orders/orderService.ts line 17). Different (user, page) pairs produce the same string, e.g. user 1 page 23 and user 12 page 3 both yield \"orders:123\". When such a collision happens within the 60s TTL, the second customer receives the first customer's cached order list. This is why it is rare, intermittent, and not reproducible with a few test accounts. The cache itself is not the problem; the key is ambiguous. (The hypothesis that the key omits the user id is not accurate: the user id is included, but the encoding is ambiguous.)",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: The orders cache in src/cache/cache.ts is keyed without the user id (or uses a shared per-page key), so a cached order list for one customer is returned to another customer when the cache entry is hit; this would be intermittent and invisible to single-account testing.",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: The page cache key in OrderService.ordersPage is built by concatenating userId and page with no separator: `orders:${userId}${page}` (src/orders/orderService.ts line 17). Different (user, page) pairs produce the same string, e.g. user 1 page 23 and user 12 page 3 both yield \"orders:123\". When such a collision happens within the 60s TTL, the second customer receives the first customer's cached order list. This is why it is rare, intermittent, and not reproducible with a few test accounts. The cache itself is not the problem; the key is ambiguous. (The hypothesis that the key omits the user id is not accurate: the user id is included, but the encoding is ambiguous.)",
+            "evidence_ids": [
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: The existing suite passes (E4), so it doesn't show the bug. The cache key in src/orders/orderService.ts line 17 is built as `orders:${userId}${page}` with no separator (E7). User 1 on page 11 and user 11 on page 1 both map to \"orders:111\". My repro caches user 1's page 11, then requests user 11's page 1. User 11 gets back a cache hit containing an order owned by user 1 and the script exits non-zero (E9). The shared TtlCache is in src/cache/cache.ts (E5).",
+            "evidence_ids": [
+              "E4",
+              "E5",
+              "E7",
+              "E8",
+              "E9"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 11,
+        "llm_calls": 9,
+        "cost_usd": 0.00433554,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00434
+      }
+    },
+    {
+      "scenario": "py-hard-misleading-trace",
+      "language": "Python",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "accounts/repository.py"
+        ],
+        "leading_file": "accounts/repository.py",
+        "leading_symbol": "get",
+        "root_cause": "The repository's clean() helper drops every falsy value, not just unset ones. AccountService.deactivate() stores is_active=False through repo.update(), which calls clean(), so the key is removed from the row. repo.get() then returns a dict without 'is_active' for deactivated users, and serializer.to_api() raises KeyError at user[\"is_active\"]. The serializer rename in 1.4.0 is not the cause; the serializer correctly reads the field that the data layer should provide.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: The repository returns the stored record for deactivated users without an 'is_active' key (for example, legacy records store 'active' or the flag is omitted when False), so the 1.4.0 rename in to_api reads a key that the data layer never provides for those rows.",
+            "evidence_ids": [
+              "E2",
+              "E3",
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: The repository's clean() helper drops every falsy value, not just unset ones. AccountService.deactivate() stores is_active=False through repo.update(), which calls clean(), so the key is removed from the row. repo.get() then returns a dict without 'is_active' for deactivated users, and serializer.to_api() raises KeyError at user[\"is_active\"]. The serializer rename in 1.4.0 is not the cause; the serializer correctly reads the field that the data layer should provide.",
+            "evidence_ids": [
+              "E2",
+              "E3",
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: Stored a user with is_active=False via UserRepository.add, then get() returned {'email', 'id'} with no is_active key. Passing that to to_api raised KeyError: 'is_active'. Cause: repository.clean() drops all falsy values (line 8), so False is removed. The serializer is not the root cause; the data layer omits the key for deactivated users. The existing suite (E4) passes because it does not cover deactivated users.",
+            "evidence_ids": [
+              "E5",
+              "E6",
+              "E8"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 10,
+        "llm_calls": 8,
+        "cost_usd": 0.00328231,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00328
+      }
+    },
+    {
+      "scenario": "py-hard-money-rounding",
+      "language": "Python",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "billing/normalize.py"
+        ],
+        "leading_file": "billing/invoice.py",
+        "leading_symbol": "subtotal_cents",
+        "root_cause": "billing/normalize.py::to_cents converts dollars to cents with int(amount * 100), which truncates toward zero. Float multiplication can produce a value just below the exact cent count (19.99 * 100 = 1998.9999999999998), so int() drops a cent. The truncation only affects amounts whose float product lands slightly under an integer, which is why only some customers and amounts are off by one cent. The hypothesis named invoice.py, but the conversion actually lives in normalize.py; invoice.py::line_total_cents [E5] just calls to_cents and multiplies by quantity, so the fix belongs in to_cents.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: LineItem price is converted to cents with truncation (int(price * 100)) instead of rounding; 19.99 * 100 evaluates to 1998.9999999999998, so int() yields 1998. This explains why only some amounts are off by one cent.",
+            "evidence_ids": [
+              "E2",
+              "E5",
+              "E7"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: billing/normalize.py::to_cents converts dollars to cents with int(amount * 100), which truncates toward zero. Float multiplication can produce a value just below the exact cent count (19.99 * 100 = 1998.9999999999998), so int() drops a cent. The truncation only affects amounts whose float product lands slightly under an integer, which is why only some customers and amounts are off by one cent. The hypothesis named invoice.py, but the conversion actually lives in normalize.py; invoice.py::line_total_cents [E5] just calls to_cents and multiplies by quantity, so the fix belongs in to_cents.",
+            "evidence_ids": [
+              "E7",
+              "E5"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: The existing suite passed (E9), so I wrote a repro calling monthly_report with Dana's single 19.99 LineItem. It printed ['Dana: $19.98'] and exited 1, matching the reported one-cent-low total. The cause is in billing/normalize.py to_cents (E12): int(amount * 100) truncates, so 19.99 becomes 1998. billing/invoice.py line_total_cents (E10) calls to_cents, and billing/report.py (E11) formats the result.",
+            "evidence_ids": [
+              "E9",
+              "E10",
+              "E11",
+              "E12",
+              "E13"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 15,
+        "llm_calls": 11,
+        "cost_usd": 0.00338599,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00339
+      }
+    }
+  ]
+}

@@ -85,7 +85,9 @@ class LLMReasoner:
         bind their reasoning to the exact earlier context, so editing it would invalidate that reasoning.
         """
         submit_name = submit_schema.__name__
-        model = self._model.bind_tools([*tools, submit_schema])
+        # strict=True: the API guarantees every tool call matches its JSON schema. Without it the model
+        # sometimes dropped required fields or sent a list as a string (found in the LangSmith traces).
+        model = self._model.bind_tools([*tools, submit_schema], strict=True)
         by_name = {t.name: t for t in tools}
         messages: list[BaseMessage] = [SystemMessage(system), HumanMessage(user)]
 

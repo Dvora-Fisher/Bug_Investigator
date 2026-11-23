@@ -6,6 +6,12 @@
       "runtimeExecutable": "D:\\Users\\User\\Documents\\bug-investigator\\backend\\.venv\\Scripts\\python.exe",
       "runtimeArgs": ["-m", "uvicorn", "investigator.api.app:app", "--port", "8000"],
       "port": 8000
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["D:\\Users\\User\\Documents\\bug-investigator\\frontend\\node_modules\\vite\\bin\\vite.js", "D:\\Users\\User\\Documents\\bug-investigator\\frontend"],
+      "port": 5173
     }
   ]
 }

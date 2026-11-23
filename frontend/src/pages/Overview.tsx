@@ -18,10 +18,12 @@ export default function Overview({ health }: { health: Health | null }) {
     return () => clearInterval(t);
   }, []);
 
-  const latest = (mode: string, difficulty: string) =>
-    [...experiments].reverse().find((e) => e.mode === mode && e.difficulty === difficulty);
-  const finalImproved = latest("improved", "basic");
-  const finalBaseline = latest("baseline", "basic");
+  // Both cards describe YOUR investigations, so they never depend on the evaluation data being available.
+  const finished = (items ?? []).filter((i) => i.outcome);
+  const verifiedRate = finished.length ? finished.filter((i) => i.outcome === "fixed_and_verified").length / finished.length : null;
+  const costed = (items ?? []).filter((i) => (i.cost_usd ?? 0) > 0);
+  const avgCost = costed.length ? costed.reduce((s, i) => s + i.cost_usd, 0) / costed.length : null;
+  const evalFinal = [...experiments].reverse().find((e) => e.mode === "improved" && e.difficulty === "basic");
   const waiting = (items ?? []).filter((i) => i.status === "waiting_for_human");
   const running = (items ?? []).filter((i) => i.status === "running").length;
 
@@ -42,11 +44,11 @@ export default function Overview({ health }: { health: Health | null }) {
       <div className="grid cols-4" style={{ marginBottom: 18 }}>
         <Kpi label="Investigations" icon={<Bug size={15} />} value={items?.length ?? "–"}
           foot={<>{running} running · {waiting.length} waiting for review</>} />
-        <Kpi label="Verified fix rate" icon={<ShieldCheck size={15} />} value={pct(finalImproved?.summary.fix_success)}
-          foot={<>hidden tests · {finalImproved?.scenarios ?? "–"} evaluation scenarios</>} />
-        <Kpi label="Cost per investigation" icon={<Coins size={15} />}
-          value={finalBaseline?.summary.cost_usd != null ? usd(finalBaseline.summary.cost_usd) : "–"}
-          foot={<>baseline · improved {finalImproved?.summary.cost_usd != null ? usd(finalImproved.summary.cost_usd) : "–"}</>} />
+        <Kpi label="Verified fix rate" icon={<ShieldCheck size={15} />} value={verifiedRate == null ? "–" : pct(verifiedRate)}
+          foot={finished.length ? <>of {finished.length} finished investigation{finished.length > 1 ? "s" : ""}</>
+            : evalFinal ? <>benchmark: {pct(evalFinal.summary.fix_success)} on {evalFinal.scenarios} bugs</> : "no finished investigations yet"} />
+        <Kpi label="Cost per investigation" icon={<Coins size={15} />} value={avgCost == null ? "–" : usd(avgCost)}
+          foot={costed.length ? <>average of {costed.length} investigation{costed.length > 1 ? "s" : ""}</> : "no investigations yet"} />
         <div className="card kpi row" style={{ justifyContent: "space-between" }}>
           <div>
             <div className="kpi-label"><span className="kpi-icon"><Coins size={15} /></span>Monthly budget</div>

@@ -16,6 +16,9 @@ export default function HeroArt() {
         <radialGradient id="ha-lens" cx="0.35" cy="0.3" r="0.8">
           <stop offset="0" stopColor="rgba(255,255,255,0.22)" /><stop offset="0.6" stopColor="rgba(94,179,255,0.08)" /><stop offset="1" stopColor="rgba(94,179,255,0.02)" />
         </radialGradient>
+        <radialGradient id="ha-shell" cx="0.35" cy="0.3" r="0.85">
+          <stop offset="0" stopColor="#c4b5fd" /><stop offset="0.55" stopColor="#8b5cf6" /><stop offset="1" stopColor="#6d28d9" />
+        </radialGradient>
         <clipPath id="ha-lens-clip"><circle cx="0" cy="0" r="54" /></clipPath>
         <filter id="ha-blur"><feGaussianBlur stdDeviation="18" /></filter>
       </defs>
@@ -42,23 +45,39 @@ export default function HeroArt() {
         {lines.map((l, i) => (
           <g key={i}>
             <text x="16" y={64 + i * 22} style={{ fontSize: 10, fill: "#3d4763", fontFamily: "var(--mono)" }}>{i + 1}</text>
-            {l.bug && <rect x="30" y={51 + i * 22} width="282" height="20" rx="5" fill="rgba(240,82,82,0.12)" className="ha-hot" />}
-            <rect x="38" y={57 + i * 22} width={l.w} height="8" rx="4" fill={l.bug ? "#f08a8a" : l.c} opacity={l.bug ? 0.9 : 0.55} />
+            {l.bug && <rect x="30" y={51 + i * 22} width="282" height="20" rx="5" fill="rgba(250,178,25,0.14)" className="ha-hot" />}
+            <rect x="38" y={57 + i * 22} width={l.w} height="8" rx="4" fill={l.bug ? "#f7c769" : l.c} opacity={l.bug ? 0.85 : 0.55} />
           </g>
         ))}
-        {/* the bug */}
-        <g transform="translate(262 149)" className="ha-bug">
-          <ellipse cx="0" cy="0" rx="9" ry="11" fill="#f05252" />
-          <circle cx="0" cy="-12" r="5" fill="#f05252" />
-          <line x1="0" y1="-11" x2="0" y2="11" stroke="#0b1020" strokeWidth="1.5" />
-          {[-6, 0, 6].map((y) => (
-            <g key={y}>
-              <line x1="-9" y1={y} x2="-16" y2={y - 3} stroke="#f05252" strokeWidth="2" strokeLinecap="round" />
-              <line x1="9" y1={y} x2="16" y2={y - 3} stroke="#f05252" strokeWidth="2" strokeLinecap="round" />
-            </g>
-          ))}
-          <line x1="-3" y1="-16" x2="-7" y2="-22" stroke="#f05252" strokeWidth="1.6" strokeLinecap="round" />
-          <line x1="3" y1="-16" x2="7" y2="-22" stroke="#f05252" strokeWidth="1.6" strokeLinecap="round" />
+        {/* the bug: a small, friendly ladybug */}
+        <g transform="translate(262 142)">
+          <g className="ha-bug">
+            {/* antennae with round tips */}
+            <path d="M-5 -13 Q-9 -22 -13 -23" fill="none" stroke="#4c3d8f" strokeWidth="1.8" strokeLinecap="round" />
+            <path d="M5 -13 Q9 -22 13 -23" fill="none" stroke="#4c3d8f" strokeWidth="1.8" strokeLinecap="round" />
+            <circle cx="-13.5" cy="-23.5" r="2.6" fill="#f9a8d4" />
+            <circle cx="13.5" cy="-23.5" r="2.6" fill="#f9a8d4" />
+            {/* tiny feet */}
+            {[-17, 17].map((x) => <ellipse key={x} cx={x} cy="9" rx="3.4" ry="2.2" fill="#4c3d8f" />)}
+            {/* round shell */}
+            <circle cx="0" cy="5" r="15" fill="url(#ha-shell)" />
+            <path d="M0 -9 V19" stroke="rgba(28,18,60,0.35)" strokeWidth="1.4" />
+            <circle cx="-7" cy="8" r="2.6" fill="rgba(255,255,255,0.35)" />
+            <circle cx="7" cy="11" r="2.2" fill="rgba(255,255,255,0.35)" />
+            <circle cx="6" cy="1" r="1.8" fill="rgba(255,255,255,0.35)" />
+            <ellipse cx="-6" cy="-1" rx="5" ry="2.6" fill="rgba(255,255,255,0.25)" transform="rotate(-25 -6 -1)" />
+            {/* head with a happy face */}
+            <circle cx="0" cy="-9" r="9" fill="#5b4bb0" />
+            <circle cx="-3.4" cy="-10" r="2.7" fill="#fff" />
+            <circle cx="3.4" cy="-10" r="2.7" fill="#fff" />
+            <circle cx="-3" cy="-9.6" r="1.4" fill="#1b1340" />
+            <circle cx="3.8" cy="-9.6" r="1.4" fill="#1b1340" />
+            <circle cx="-2.6" cy="-10.4" r="0.55" fill="#fff" />
+            <circle cx="4.2" cy="-10.4" r="0.55" fill="#fff" />
+            <circle cx="-6" cy="-6.6" r="1.5" fill="#f9a8d4" opacity="0.8" />
+            <circle cx="6" cy="-6.6" r="1.5" fill="#f9a8d4" opacity="0.8" />
+            <path d="M-2 -6 Q0 -4.2 2 -6" fill="none" stroke="#1b1340" strokeWidth="1.1" strokeLinecap="round" />
+          </g>
         </g>
       </g>
 

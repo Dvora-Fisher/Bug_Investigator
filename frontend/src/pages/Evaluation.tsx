@@ -24,7 +24,15 @@ const ROUND_NOTES = ["before fixes", "+ strict schema", "+ edits first"];
 export default function Evaluation() {
   const [experiments, setExperiments] = useState<Experiment[] | null>(null);
   const [set, setSet] = useState<"basic" | "hard">("hard");
-  useEffect(() => { api.evaluation().then(setExperiments).catch(() => setExperiments([])); }, []);
+  const [loadError, setLoadError] = useState("");
+  useEffect(() => {
+    api.evaluation().then(setExperiments).catch((e) => {
+      setLoadError(e?.status === 404
+        ? "The API server is running an older version without evaluation data. Restart the backend (uvicorn) and reload."
+        : "Could not reach the API server. Make sure the backend is running on port 8000.");
+      setExperiments([]);
+    });
+  }, []);
 
   const data = useMemo(() => {
     const all = experiments ?? [];
@@ -43,6 +51,7 @@ export default function Evaluation() {
   }, [experiments]);
 
   if (experiments === null) return <div className="page"><div className="skeleton" style={{ height: 400 }} /></div>;
+  if (loadError) return <div className="page"><div className="callout callout-bad"><AlertTriangle size={17} /><div>{loadError}</div></div></div>;
   if (!experiments.length) return <div className="page"><div className="callout callout-info">No saved experiments in evaluation/results yet.</div></div>;
 
   const pair = set === "basic" ? data.final : data.hard;

@@ -5,6 +5,8 @@
   --read-only + tmpfs     the image cannot be modified; scratch space is in memory
   --cap-drop ALL, no-new-privileges, non-root user
   -v <workspace>:/workspace   only the investigation's copy of the project is visible
+  -v <cache>:/cache       optional shared package cache: writable only for the fixed install
+                          command, read-only while project code runs (so it cannot be poisoned)
   timeout                 the container is killed when it runs too long
 
 No host environment variables are passed in, so API keys and other secrets never reach the sandbox.
@@ -24,6 +26,15 @@ from pathlib import Path
 from ..config import Settings
 
 log = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class Volume:
+    """A named Docker volume mounted into the container (used for the shared package cache)."""
+
+    name: str
+    path: str
+    read_only: bool
 
 
 @dataclass(frozen=True)
@@ -60,7 +71,8 @@ class DockerRunner:
             ["docker", "image", "inspect", image], capture_output=True).returncode == 0
 
     def run(self, image: str, argv: Sequence[str], workdir: Path, *, network: bool,
-            timeout_s: int, env: Mapping[str, str] | None = None) -> ExecResult:
+            timeout_s: int, env: Mapping[str, str] | None = None,
+            volumes: Sequence[Volume] = ()) -> ExecResult:
         name = f"bug-investigator-{uuid.uuid4().hex[:12]}"
         cmd = [
             "docker", "run", "--rm", "--name", name,
@@ -71,6 +83,7 @@ class DockerRunner:
             "--read-only", "--tmpfs", "/tmp:rw,exec,size=1g",
             "--user", "10001:10001",
             "-v", f"{workdir.resolve()}:/workspace:rw", "-w", "/workspace",
+            *[arg for v in volumes for arg in ("-v", f"{v.name}:{v.path}:{'ro' if v.read_only else 'rw'}")],
             *[arg for k, v in (env or {}).items() for arg in ("-e", f"{k}={v}")],
             image, *argv,
         ]

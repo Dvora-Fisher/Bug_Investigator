@@ -11,8 +11,8 @@ from fnmatch import fnmatch
 from typing import Protocol
 
 from ..config import Settings
-from ..runtimes.base import RuntimeAdapter
-from .docker_runner import ExecResult
+from ..runtimes.base import CACHE_MOUNT, RuntimeAdapter
+from .docker_runner import ExecResult, Volume
 from .workspace import Workspace, WorkspaceError
 
 _SAFE_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,80}$")
@@ -22,7 +22,7 @@ class Runner(Protocol):
     def image_exists(self, image: str) -> bool: ...
 
     def run(self, image: str, argv: Sequence[str], workdir, *, network: bool, timeout_s: int,
-            env=None) -> ExecResult: ...
+            env=None, volumes: Sequence[Volume] = ()) -> ExecResult: ...
 
 
 class Executor:
@@ -73,5 +73,10 @@ class Executor:
         return f".investigator/repro/{name}"
 
     def _run(self, argv: Sequence[str], *, network: bool = False, timeout_s: int | None = None) -> ExecResult:
+        env, volumes = dict(self._adapter.env), []
+        if self._s.shared_package_cache and self._adapter.cache_env:
+            env |= self._adapter.cache_env
+            # Writable only during the install step (network on, fixed command); read-only otherwise.
+            volumes.append(Volume(self._adapter.cache_volume, CACHE_MOUNT, read_only=not network))
         return self._runner.run(self._adapter.image, argv, self._ws.project, network=network,
-                                timeout_s=timeout_s or self._s.sandbox_run_timeout_s, env=self._adapter.env)
+                                timeout_s=timeout_s or self._s.sandbox_run_timeout_s, env=env, volumes=volumes)

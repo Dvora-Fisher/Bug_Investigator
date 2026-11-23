@@ -1,0 +1,395 @@
+{
+  "experiment": "improved-pilot-b83e5a46",
+  "mode": "improved",
+  "finished_at": "2026-11-23T18:24:10.901352+00:00",
+  "scenarios": 5,
+  "total_spend_usd": 0.0188,
+  "summary": {
+    "bug_reproduced": 1.0,
+    "cost_usd": 0.0036,
+    "file_localization": 1.0,
+    "fix_success": 1.0,
+    "function_localization": 1.0,
+    "root_cause_accuracy": 1.0,
+    "tests_pass_after_fix": 1.0,
+    "unsupported_claim_rate": 0.0
+  },
+  "rows": [
+    {
+      "scenario": "js-api-error",
+      "language": "JavaScript",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "src/api.js"
+        ],
+        "leading_file": "src/api.js",
+        "leading_symbol": "request",
+        "root_cause": "fetchProfile in src/api.js does not implement the contract its own doc comment describes. It returns res.json() for every response, without checking the status. A 404 (deleted user) and a failed API response therefore produce a truthy object, usually an error body with no firstName/lastName. fullName() only falls back to \"Unknown user\" for a falsy profile, so it builds \"undefined undefined\" from the missing fields. The H2 hypothesis points at a function named `request`, but E3 shows no such definition exists, so the real defect is in fetchProfile.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "root cause: fetchProfile in src/api.js does not implement the contract its own doc comment describes. It returns res.json() for every response, without checking the status. A 404 (deleted user) and a failed API response therefore produce a truthy object, usually an error body with no firstName/lastName. fullName() only falls back to \"Unknown user\" for a falsy profile, so it builds \"undefined undefined\" from the missing fields. The H2 hypothesis points at a function named `request`, but E3 shows no such definition exists, so the real defect is in fetchProfile.",
+            "evidence_ids": [
+              "E3",
+              "E4"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: Wrote a repro that stubs fetch to return a 404 with JSON body {error: \"Not found\"} and passes the result through fetchProfile and fullName. The script prints name = \"undefined undefined\" and exits 1, where \"Unknown user\" is expected. The root cause is in src/api.js: fetchProfile returns res.json() without checking res.ok and never returns null for a 404, despite its doc comment saying it does. fullName therefore receives a truthy error object and interpolates its missing firstName/lastName. The existing suite (E5) only covers the success path, so it does not catch this. The API-down case was not separately reproduced; it follows the same unchecked-response path but I did not run it.",
+            "evidence_ids": [
+              "E9",
+              "E11",
+              "E5"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 13,
+        "llm_calls": 11,
+        "cost_usd": 0.00384347,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00384
+      }
+    },
+    {
+      "scenario": "py-infinite-loop",
+      "language": "Python",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "search/bisect_tools.py"
+        ],
+        "leading_file": "search/bisect_tools.py",
+        "leading_symbol": "first_at_least",
+        "root_cause": "In first_at_least, when sorted_values[mid] < target the low bound is set to mid instead of mid + 1. Since mid can equal lo (for example when lo=2, hi=4 gives mid=3, and when lo=2, hi=3 gives mid=2), lo stops advancing and the while loop never terminates for targets greater than the middle element.</root_cause>\n<parameter name=\"explanation\">Trace for first_at_least([1, 3, 5, 7], 6): lo=0, hi=4, mid=2, value 5 < 6 so lo=2. Next mid=3, value 7 is not < 6 so hi=3. Then mid=(2+3)//2=2, value 5 < 6 so lo=mid=2 again. lo and hi never converge, so the loop spins forever. Setting lo = mid + 1 excludes the mid element, which is known to be less than target, so the range shrinks every iteration and the function returns 3 (the index of 7). The fix is the standard bisect_left logic and does not special-case any input.</explanation>\n<parameter name=\"evidence_ids\">[\"E2\"]",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: In first_at_least, the binary search loop updates the low bound incorrectly when the target is greater than the middle element (e.g. lo = mid instead of mid + 1), so lo never advances and the while loop spins forever for targets above the first item.",
+            "evidence_ids": [
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: In first_at_least, the binary search loop updates the low bound incorrectly when the target is greater than the middle element (e.g. lo = mid instead of mid + 1), so lo never advances and the while loop spins forever for targets above the first item.",
+            "evidence_ids": [
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: In first_at_least, when sorted_values[mid] < target the low bound is set to mid instead of mid + 1. Since mid can equal lo (for example when lo=2, hi=4 gives mid=3, and when lo=2, hi=3 gives mid=2), lo stops advancing and the while loop never terminates for targets greater than the middle element.</root_cause>\n<parameter name=\"explanation\">Trace for first_at_least([1, 3, 5, 7], 6): lo=0, hi=4, mid=2, value 5 < 6 so lo=2. Next mid=3, value 7 is not < 6 so hi=3. Then mid=(2+3)//2=2, value 5 < 6 so lo=mid=2 again. lo and hi never converge, so the loop spins forever. Setting lo = mid + 1 excludes the mid element, which is known to be less than target, so the range shrinks every iteration and the function returns 3 (the index of 7). The fix is the standard bisect_left logic and does not special-case any input.</explanation>\n<parameter name=\"evidence_ids\">[\"E2\"]",
+            "evidence_ids": [
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: The existing test suite shows the hang. test_target_in_the_middle calls first_at_least([1, 3, 5, 7], 5) through finishes_within(2, ...), and the worker thread was still alive after 2s (\"did not finish within 2s (infinite loop?)\"). The target is above the first element, which is the same condition as the report (target 6 with first element 1). The other test, which uses a small target, passes. The failure is a hang, not a wrong result, consistent with the report.",
+            "evidence_ids": [
+              "E3"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 4,
+        "llm_calls": 7,
+        "cost_usd": 0.0029650500000000003,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00297
+      }
+    },
+    {
+      "scenario": "py-off-by-one",
+      "language": "Python",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "stats/moving.py"
+        ],
+        "leading_file": "stats/moving.py",
+        "leading_symbol": "moving_average",
+        "root_cause": "The loop in moving_average iterates over range(len(values) - window), which excludes the last valid window start index. The correct number of windows is len(values) - window + 1.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: The loop bound in moving_average is off by one: it iterates over range(len(values) - window) rather than range(len(values) - window + 1), so the last full window is never averaged. For [1,2,3,4] window 2 this yields only two windows, and for window equal to length it yields zero windows, matching both failing tests.",
+            "evidence_ids": [
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: The loop bound in moving_average is off by one: it iterates over range(len(values) - window) rather than range(len(values) - window + 1), so the last full window is never averaged. For [1,2,3,4] window 2 this yields only two windows, and for window equal to length it yields zero windows, matching both failing tests.",
+            "evidence_ids": [
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: The loop in moving_average iterates over range(len(values) - window), which excludes the last valid window start index. The correct number of windows is len(values) - window + 1.",
+            "evidence_ids": [
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: Existing test suite: test_window_of_two fails with moving_average([1,2,3,4],2) returning [1.5, 2.5] instead of [1.5, 2.5, 3.5]; test_window_equal_to_length fails with moving_average([2,4,6],3) returning [] instead of [4.0]. Both match the reported off-by-one (last window dropped).",
+            "evidence_ids": [
+              "E3"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 4,
+        "llm_calls": 7,
+        "cost_usd": 0.00219186,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00219
+      }
+    },
+    {
+      "scenario": "py-regression",
+      "language": "Python",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "checkout/coupons.py"
+        ],
+        "leading_file": "checkout/coupons.py",
+        "leading_symbol": "",
+        "root_cause": "In checkout/coupons.py, `apply_coupons` has a mutable default argument `coupons: list[float] = []` [E1]. Python evaluates that default once, at function definition, so every call that omits `coupons` shares the same list object. The function then does `coupons.append(c)` for each `new_coupons` entry [E1], so each checkout's coupons are added to that shared list and remain there. Later checkouts loop over the accumulated list and apply earlier customers' discounts. The bug persists for the life of the process and is cleared only by a restart, which matches the report.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: A module-level mutable default (e.g. a list or dict used as a default argument or a shared class attribute in checkout/coupons.py) accumulates applied coupons across calls, so later checkouts inherit earlier customers' coupons.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: A module-level mutable default (e.g. a list or dict used as a default argument or a shared class attribute in checkout/coupons.py) accumulates applied coupons across calls, so later checkouts inherit earlier customers' coupons.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: In checkout/coupons.py, `apply_coupons` has a mutable default argument `coupons: list[float] = []` [E1]. Python evaluates that default once, at function definition, so every call that omits `coupons` shares the same list object. The function then does `coupons.append(c)` for each `new_coupons` entry [E1], so each checkout's coupons are added to that shared list and remain there. Later checkouts loop over the accumulated list and apply earlier customers' discounts. The bug persists for the life of the process and is cleared only by a restart, which matches the report.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: Repro script calls apply_coupons(100, [10]) then apply_coupons(100) with no coupons. The second call returns 90.0 instead of 100.0, because the shared mutable default list `coupons=[]` in checkout/coupons.py (line 4) keeps the first customer's 10% coupon. The existing test suite passed (E3) and did not exercise this path.",
+            "evidence_ids": [
+              "E3",
+              "E4",
+              "E5"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 7,
+        "llm_calls": 9,
+        "cost_usd": 0.00284089,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00284
+      }
+    },
+    {
+      "scenario": "ts-async-exception",
+      "language": "TypeScript",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "src/importer.ts"
+        ],
+        "leading_file": "src/importer.ts",
+        "leading_symbol": "importBatch",
+        "root_cause": "In importBatch, the save promises produced by records.map((r) => save(r)) are discarded and never awaited. The try block therefore finishes synchronously and returns { ok: true, imported: records.length } before any save settles. When a save later rejects (duplicate key), nothing catches it, so it surfaces as an unhandled promise rejection. The catch block can never run because the rejections happen outside the try.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: In the batch loop, save() calls are not awaited or their promises are not collected (e.g. fire-and-forget forEach/map without Promise.all), so rejections are never caught and the result object is built before the saves settle, leading to ok: true and an unhandled rejection.",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: In the batch loop, save() calls are not awaited or their promises are not collected (e.g. fire-and-forget forEach/map without Promise.all), so rejections are never caught and the result object is built before the saves settle, leading to ok: true and an unhandled rejection.",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H4 supported: src/importer.ts::importBatch fires save() for every record via records.map without awaiting or collecting the promises, and returns { ok: true, imported: records.length } synchronously; the try/catch only catches synchronous throws, so duplicate-key rejections escape as unhandled rejections and the reported count ignores actual save outcomes. The fix is to await Promise.all (or allSettled) and derive ok and imported from settled results.",
+            "evidence_ids": [
+              "E10",
+              "E8"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: In the batch loop, save() calls are not awaited or their promises are not collected (e.g. fire-and-forget forEach/map without Promise.all), so rejections are never caught and the result object is built before the saves settle, leading to ok: true and an unhandled rejection.",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: In importBatch, the save promises produced by records.map((r) => save(r)) are discarded and never awaited. The try block therefore finishes synchronously and returns { ok: true, imported: records.length } before any save settles. When a save later rejects (duplicate key), nothing catches it, so it surfaces as an unhandled promise rejection. The catch block can never run because the rejections happen outside the try.",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: Ran a repro that calls importBatch with 250 records and a save() that always rejects with \"duplicate key\". The result was {\"ok\":true,\"imported\":250}, and the process then crashed with an unhandled \"duplicate key\" rejection. The cause is src/importer.ts line 10: `records.map((r) => save(r))` starts the saves but never awaits them or collects the promises, so the try/catch never sees the rejections and ok:true is returned first. The existing test suite passed and does not cover failing saves, so it did not show the bug.",
+            "evidence_ids": [
+              "E12",
+              "E15"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 2,
+        "fix_attempts": 1,
+        "evidence_items": 17,
+        "llm_calls": 21,
+        "cost_usd": 0.00634059,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00634
+      }
+    }
+  ]
+}

@@ -28,6 +28,9 @@ ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
 RUN sh -c "$SETUP"
 
 # Project code never runs as root.
-RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin runner
+RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin runner \
+    && mkdir -p /cache && chown 10001:10001 /cache
+# /cache: mount point of the shared package cache volume. An empty named volume inherits this
+# folder's ownership on first use, so the non-root user can write to it during installs.
 USER 10001:10001
 WORKDIR /workspace

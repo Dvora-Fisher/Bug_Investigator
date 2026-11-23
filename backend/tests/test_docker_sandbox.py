@@ -58,6 +58,13 @@ def test_only_the_workspace_is_mounted(runner, ws):
     assert r.ok and "stats" in r.output and "original" not in r.output
 
 
+def test_project_code_cannot_write_to_the_shared_cache(runner, ws, settings):
+    executor = Executor(runner, ws, PYTHON, settings)
+    assert executor.install().ok  # the install step may write to the cache
+    r = executor.run_command(["python", "-c", "open('/cache/poison', 'w')"])
+    assert not r.ok and "Read-only file system" in r.output
+
+
 def test_timeout_kills_the_container(runner, ws):
     r = py(runner, ws, "import time; time.sleep(60)", timeout_s=3)
     assert r.timed_out and r.exit_code is None

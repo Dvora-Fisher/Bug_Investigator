@@ -11,7 +11,8 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from pathlib import Path
 
-SANDBOX_TAG = "1"  # bump when sandbox-images/Dockerfile changes, to force a rebuild
+SANDBOX_TAG = "2"  # bump when sandbox-images/Dockerfile changes, to force a rebuild
+CACHE_MOUNT = "/cache"  # where the shared package cache volume is mounted inside a container
 
 
 class Capability(IntEnum):
@@ -41,11 +42,17 @@ class RuntimeAdapter:
     test_filter_args: tuple[str, ...] = ()  # e.g. ("-k",): how to run a subset of tests
     image_setup: str = "true"  # extra shell step while building the image
     env: Mapping[str, str] = field(default_factory=dict)
+    # Environment that points the package manager at the shared cache (used when the cache is enabled).
+    cache_env: Mapping[str, str] = field(default_factory=dict)
     allowed_executables: frozenset[str] = field(default_factory=frozenset)
 
     @property
     def image(self) -> str:
         return f"bug-investigator/{self.name}:{SANDBOX_TAG}"
+
+    @property
+    def cache_volume(self) -> str:
+        return f"bug-investigator-cache-{self.name}"
 
     def matches(self, root: Path) -> bool:
         return any(next(root.rglob(pattern), None) is not None for pattern in self.markers)

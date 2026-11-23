@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     sandbox_run_timeout_s: int = 180
     sandbox_install_timeout_s: int = 600
     max_repro_tool_steps: int = 4
+    # Reuse downloaded packages (NuGet / pip / npm) across investigations. The cache is writable only
+    # by the fixed install command and read-only while project code runs. Set false for full isolation.
+    shared_package_cache: bool = True
 
     # --- Network ---
     # Verify HTTPS certificates with the operating system's certificate store instead of Python's

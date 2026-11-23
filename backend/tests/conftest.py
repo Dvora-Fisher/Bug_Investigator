@@ -77,9 +77,10 @@ class FakeRunner:
     def image_exists(self, image: str) -> bool:
         return True
 
-    def run(self, image, argv, workdir, *, network, timeout_s, env=None) -> ExecResult:
+    def run(self, image, argv, workdir, *, network, timeout_s, env=None, volumes=()) -> ExecResult:
         command = " ".join(argv)
         self.calls.append((command, network))
+        self.volumes = list(volumes)
         for prefix, queue in self.results.items():
             if command.startswith(prefix) and queue:
                 return replace(queue.pop(0), command=command)

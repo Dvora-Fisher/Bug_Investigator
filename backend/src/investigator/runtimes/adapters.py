@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .base import Capability, RuntimeAdapter
+from .base import CACHE_MOUNT, Capability, RuntimeAdapter
 
 WORK = "/workspace/.investigator"  # our private folder inside the project copy (hidden from the LLM's tools)
 
@@ -29,6 +29,7 @@ PYTHON = RuntimeAdapter(
     test_cmd=("python", "-m", "pytest", "-q", "-p", "no:cacheprovider", "--ignore=.investigator"),
     test_filter_args=("-k",),
     env={"PYTHONPATH": f"/workspace:/workspace/src:{WORK}/deps"},
+    cache_env={"PIP_CACHE_DIR": f"{CACHE_MOUNT}/pip"},
     allowed_executables=frozenset({"python", "pytest"}),
 )
 
@@ -43,6 +44,7 @@ DOTNET = RuntimeAdapter(
     test_filter_args=("--filter",),
     # No background build servers: every container must exit as soon as its command ends.
     env={"NUGET_PACKAGES": f"{WORK}/nuget", "MSBUILDDISABLENODEREUSE": "1", "DOTNET_CLI_USE_MSBUILD_SERVER": "0"},
+    cache_env={"NUGET_PACKAGES": f"{CACHE_MOUNT}/nuget"},  # packages are read from here at build/test time
     allowed_executables=frozenset({"dotnet"}),
 )
 
@@ -58,6 +60,7 @@ NODE = RuntimeAdapter(
     test_cmd=("npm", "test", "--silent"),
     test_filter_args=("--", "-t"),
     env={"npm_config_cache": "/tmp/.npm"},
+    cache_env={"npm_config_cache": f"{CACHE_MOUNT}/npm"},
     allowed_executables=frozenset({"node", "npm", "npx"}),
 )
 

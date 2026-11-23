@@ -109,6 +109,19 @@ def test_install_runs_once_per_workspace(executor):
     assert [cmd.split()[0] for cmd, _ in executor._runner.calls] == ["sh", "python"]
 
 
+def test_shared_cache_is_writable_only_while_installing(executor):
+    executor.install()
+    assert [(v.path, v.read_only) for v in executor._runner.volumes] == [("/cache", False)]
+    executor.run_tests()
+    assert [(v.path, v.read_only) for v in executor._runner.volumes] == [("/cache", True)]
+
+
+def test_shared_cache_can_be_disabled(executor):
+    executor._s.shared_package_cache = False
+    executor.run_tests()
+    assert executor._runner.volumes == []
+
+
 def test_changed_dependency_file_triggers_reinstall(executor):
     executor.install()
     executor._ws.apply([FileEdit(path="requirements.txt", old="pytest\n", new="pytest\nPyYAML\n")])

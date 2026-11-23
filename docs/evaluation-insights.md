@@ -1,113 +1,104 @@
-# Evaluation insights from the LangSmith traces
+# תובנות מההערכה ומה-Traces ב-LangSmith
 
-All numbers come from real runs (real model `claude-haiku-5-5`, real Docker sandboxes) on the
-`bug-investigator-scenarios` dataset. The result files are in `evaluation/results/`.
-Total API spend for all evaluation runs: about $0.54.
+כל המספרים כאן נמדדו בהרצות אמיתיות (המודל `claude-haiku-5-5`, סביבות Docker אמיתיות) על ה-Dataset
+`bug-investigator-scenarios`. קובצי התוצאות נמצאים ב-`evaluation/results/`.
+ההוצאה הכוללת על ה-API בכל הרצות ההערכה: כ-$0.54.
 
-## 1. Main insight: the diagnosis was right, the fix form was broken
+## 1. התובנה העיקרית: האבחון היה נכון, טופס התיקון היה שבור
 
-The first experiment looked like a reasoning problem: only 89% (Baseline) and 72% (Improved) of the fixes
-passed the hidden tests. The metrics told a different story. **Diagnosis was perfect in both modes**:
-100% correct file, 100% correct function, 100% correct root cause (LLM judge). Every failure happened in
-one step, `propose_fix`, where the model submits its fix through the `FixProposal` tool.
+בניסוי הראשון זה נראה כמו בעיית חשיבה: רק 89% (Baseline) ו-72% (Improved) מהתיקונים עברו את הבדיקות הנסתרות.
+המדדים סיפרו סיפור אחר. **האבחון היה מושלם בשני המצבים**: 100% קובץ נכון, 100% פונקציה נכונה ו-100% סיבת שורש
+נכונה (לפי שופט LLM). כל הכישלונות קרו בשלב אחד, `propose_fix`, שבו המודל מגיש את התיקון דרך הכלי `FixProposal`.
 
-The traces showed why. In 42 of 44 fix submissions the tool call itself was malformed: required fields
-were missing, a list was sent as a string, and in some calls the model wrote other fields *inside* a text
-field as XML tags. In the screenshot, the system rejects the submission ("Field required"). The model
-answers that it is resubmitting with the missing field, but `edits` and `evidence_ids` end up as
-`<parameter …>` text inside `explanation`:
+ה-Traces הראו למה. ב-42 מתוך 44 הגשות, קריאת הכלי עצמה הייתה שבורה. היו בה שדות חובה חסרים, רשימה שנשלחה כטקסט,
+ובחלק מהקריאות המודל כתב שדות אחרים **בתוך** שדה טקסט, כתגיות XML. בצילום המערכת דוחה את ההגשה ("Field required").
+המודל עונה שהוא שולח שוב עם השדה החסר, אבל `edits` ו-`evidence_ids` נכנסים כטקסט `<parameter …>` לתוך `explanation`:
 
-![Round 1: the FixProposal call with edits written inside the explanation field](screenshots/01-round1-broken-fix-form.png)
+![סבב 1: קריאת FixProposal שבה השינויים כתובים בתוך שדה ההסבר](screenshots/01-round1-broken-fix-form.png)
 
-Two small, general changes to the tool schema fixed it. Neither changed the prompt's reasoning
-instructions:
+שני שינויים קטנים וכלליים במבנה הכלי פתרו את הבעיה, בלי לשנות את הנחיות החשיבה בפרומפט:
 
-| Round | Change (commit) | What the next traces showed | Fix passes hidden tests (Baseline / Improved) |
+| סבב | שינוי (commit) | מה ה-Traces הראו אחריו | תיקון עובר בדיקות נסתרות (Baseline / Improved) |
 |---|---|---|---|
-| 1 | none | 42/44 tool calls malformed | 89% / 72% |
-| 2 | `strict=True` tool use (`22ed97e`) | all 37 rejected calls now had the right shape, but with an **empty** `edits: []` list | 94% / 78% |
-| 3 | `edits` moved first in the schema + at least one edit required (`5f8ece1`) | — | **100% / 100%** |
+| 1 | אין | 42/44 קריאות שבורות | 89% / 72% |
+| 2 | `strict=True` בקריאת הכלי (`22ed97e`) | כל 37 ההגשות שנדחו היו במבנה הנכון, אבל עם רשימה **ריקה** `edits: []` | 94% / 78% |
+| 3 | `edits` הועבר לראש הטופס, וחובה לפחות שינוי אחד (`5f8ece1`) | — | **100% / 100%** |
 
-The lesson in round 2 surprised us: **`strict` guarantees the structure, not the content.** The field was
-always present, but it was empty. Only putting `edits` before the long explanation fields and requiring
-at least one item made the model fill it.
+הלקח מסבב 2 הפתיע אותנו: **`strict` מבטיח את המבנה, לא את התוכן.** השדה הופיע תמיד, אבל ריק. רק העברת `edits`
+לפני שדות ההסבר הארוכים ודרישה לפחות לפריט אחד גרמו למודל למלא אותו.
 
-The final comparison on the 20 basic scenarios:
+ההשוואה הסופית על 20 התרחישים הבסיסיים:
 
-![Final Baseline vs Improved comparison on 20 scenarios](screenshots/02-final-comparison.png)
+![השוואה סופית בין Baseline ל-Improved על 20 תרחישים](screenshots/02-final-comparison.png)
 
-## 2. The critique step did not improve results
+## 2. שלב הביקורת לא שיפר את התוצאות
 
-The Improved mode adds a critique step that challenges every hypothesis and requires evidence for every
-claim. On our scenarios this step did not make the agent better:
+מצב Improved מוסיף שלב ביקורת: הוא בוחן כל השערה ודורש ראיה לכל טענה. בתרחישים שלנו השלב הזה לא שיפר את הסוכן:
 
-| Dataset | Fix passes hidden tests (Baseline / Improved) | Cost per investigation (Baseline / Improved) |
+| Dataset | תיקון עובר בדיקות נסתרות (Baseline / Improved) | עלות לחקירה (Baseline / Improved) |
 |---|---|---|
-| 20 basic scenarios | 100% / 100% | $0.0025 / $0.0035 (+40%) |
-| 5 hard scenarios | 100% / 80% | $0.0044 / $0.0060 (+36%) |
+| 20 תרחישים בסיסיים | 100% / 100% | $0.0025 / $0.0035 (+40%) |
+| 5 תרחישים קשים | 100% / 80% | $0.0044 / $0.0060 (+36%) |
 
-On the basic scenarios this is a ceiling effect: Baseline already diagnosed everything correctly, so there
-was nothing left for a critique step to improve. Improved even reproduced the bug a little less often
-(89% vs 100%).
+בתרחישים הבסיסיים זה אפקט תקרה: Baseline כבר אבחן הכול נכון, כך שלשלב הביקורת לא נשאר מה לשפר.
+Improved אפילו שחזר את הבאג קצת פחות (89% מול 100%).
 
-To test this properly we added 5 **hard** scenarios: a cause far from the symptom, a vague report with no
-error output, a fix that must touch two files, a stack trace and changelog that point at the wrong module,
-and a 13-file project with suspicious auth code around a cache-key bug. In all of them the visible tests
-pass on the buggy code, so the agent must reproduce the bug itself. Baseline still fixed all 5. Improved
-failed one:
+כדי לבדוק את זה כמו שצריך הוספנו 5 תרחישים **קשים**:
+- סיבה רחוקה מהסימפטום.
+- דיווח עמום בלי שום פלט שגיאה.
+- תיקון שחייב לגעת בשני קבצים.
+- stack trace ו-CHANGELOG שמצביעים על המודול הלא נכון.
+- פרויקט של 13 קבצים, עם קוד auth חשוד מסביב לבאג במפתח של cache.
 
-![Hard scenarios: Baseline fixed scheduler.py, Improved fixed mailer.py](screenshots/03-hard-comparison.png)
+בכולם הבדיקות הגלויות עוברות על הקוד השבור, כך שהסוכן חייב לשחזר את הבאג בעצמו. Baseline עדיין תיקן את כל ה-5,
+ו-Improved נכשל באחד:
 
-Our careful conclusion: **we found no evidence that the critique step helps, even with distractors.** We do
-not claim it is worse. With 5 scenarios and one run per mode, one scenario is 20%, and earlier rounds
-showed variance between runs.
+![תרחישים קשים: Baseline תיקן את scheduler.py, ו-Improved תיקן את mailer.py](screenshots/03-hard-comparison.png)
 
-## 3. An honesty gap: "verified" without reproducing the bug
+המסקנה הזהירה שלנו: **לא מצאנו ראיה ששלב הביקורת עוזר, גם כשיש מסיחים.** אנחנו לא טוענים שהוא גרוע יותר.
+ב-5 תרחישים ובהרצה אחת לכל מצב, תרחיש אחד שווה 20%, ובסבבים הקודמים כבר ראינו שונות בין הרצות.
 
-The one hard-scenario failure shows a weakness that matters more than the score. In `py-hard-weekly-digest`
-(users who chose Sunday never get the email, because `weekday()` counts from Monday=0 while the
-preferences use ISO days, Monday=1), the Improved run read `scheduler.py` twice but did not connect the
-two numbering systems. It followed a distractor instead: a mailer that swallows retry errors silently.
-It patched the mailer, wrote **"Unconfirmed"** as its root cause, and still reported
-`outcome: fixed_and_verified`:
+## 3. בעיית כנות: "מאומת" בלי שחזור הבאג
 
-![Improved: root cause "Unconfirmed" but outcome fixed_and_verified](screenshots/04-improved-distracted.png)
+הכישלון היחיד בתרחישים הקשים חושף חולשה שחשובה יותר מהציון. בתרחיש `py-hard-weekly-digest` משתמשים שבחרו ביום
+ראשון לא מקבלים אף פעם את המייל, כי `weekday()` סופר מיום שני=0, וההעדפות משתמשות בימים בתקן ISO, שבהם יום שני=1.
+ריצת Improved קראה את `scheduler.py` פעמיים, אבל לא חיברה בין שתי שיטות הספירה. במקום זה היא הלכה אחרי מסיח:
+רכיב שליחת מיילים שבולע בשקט שגיאות של ניסיונות חוזרים. היא תיקנה את רכיב המיילים, כתבה שסיבת השורש
+**"Unconfirmed"** (לא מאושרת), ובכל זאת דיווחה `outcome: fixed_and_verified`:
 
-For the agent, "verified" meant "my own tests pass after the fix", but those tests never exercised the
-bug. This was the only unsupported claim the claim audit found in the full experiments (only an early pilot run,
-before the final prompt, had others). On the same scenario,
-Baseline found the real cause:
+![Improved: סיבת השורש "Unconfirmed", אבל התוצאה fixed_and_verified](screenshots/04-improved-distracted.png)
 
-![Baseline on the same scenario: weekday() vs ISO weekday](screenshots/05-baseline-same-scenario.png)
+אצל הסוכן "מאומת" פירושו "הבדיקות שלי עוברות אחרי התיקון", אבל הבדיקות האלה לא בדקו את הבאג בכלל. זו הטענה
+הלא מבוססת היחידה שבדיקת הטענות מצאה בניסויים המלאים. רק בהרצת ניסיון מוקדמת, לפני הפרומפט הסופי, היו עוד.
+באותו תרחיש Baseline מצא את הסיבה האמיתית:
 
-A possible fix, **not applied** (we kept the measured version unchanged): do not allow
-`fixed_and_verified` unless the bug was reproduced first. Without a reproduction, the agent would have to
-report `fixed_unverified`.
+![Baseline באותו תרחיש: weekday() מול ימים בתקן ISO](screenshots/05-baseline-same-scenario.png)
 
-## 4. Other observations
+תיקון אפשרי, **שלא בוצע** (השארנו את הגרסה שנמדדה בלי שינוי): לא לאפשר `fixed_and_verified` אם הבאג לא שוחזר
+קודם. בלי שחזור הסוכן יצטרך לדווח `fixed_unverified`.
 
-- **Misleading evidence did not fool the agent.** In the scenario where the stack trace and the changelog
-  blame the serializer, both modes found the real cause in the repository's `clean()` function.
-- **Multi-file fixes worked.** Both modes updated both callers (`cart.ts`, `invoice.ts`) and kept the new
-  `formatPrice` signature that a third file already used.
-- **Unsupported runtimes are reported honestly.** For the Go and Java scenarios, which we cannot execute,
-  the agent analysed and fixed the bug and reported `fixed_unverified`.
-- **The unsupported-claim metric stayed near 0%.** Even Baseline cited evidence on its own. The difference
-  that Improved *requires* evidence therefore did not show in this metric.
+## 4. תצפיות נוספות
 
-## 5. Limitations
+- **ראיות מטעות לא הטעו את הסוכן.** בתרחיש שבו ה-stack trace וה-CHANGELOG מאשימים את ה-serializer, שני המצבים
+  מצאו את הסיבה האמיתית בפונקציה `clean()` של המאגר.
+- **תיקון שנוגע בכמה קבצים עבד.** שני המצבים עדכנו את שני הקבצים שקוראים לפונקציה (`cart.ts`, `invoice.ts`),
+  והשאירו את החתימה החדשה של `formatPrice` שקובץ שלישי כבר השתמש בה.
+- **שפות שאיננו מריצים מדווחות בכנות.** בתרחישי Go ו-Java, שאי אפשר להריץ אצלנו, הסוכן ניתח ותיקן את הבאג
+  ודיווח `fixed_unverified`.
+- **מדד הטענות הלא מבוססות נשאר קרוב ל-0%.** גם Baseline ציטט ראיות מעצמו, ולכן ההבדל ש-Improved **מחייב**
+  ראיות לא בא לידי ביטוי במדד הזה.
 
-- Small datasets (20 + 5 scenarios) and one run per mode, so a single scenario changes a rate by 5–20%.
-- The schema fixes in section 1 were found on the same dataset they were measured on, so there is a risk
-  of overfitting. We think it is low, because the changes are about the tool format and not about specific
-  bugs.
-- The root-cause score comes from an LLM judge, which is not perfect. For example, it gave 0.5 to a
-  correct explanation in `ts-infinite-loop`.
+## 5. מגבלות
 
-## Summary
+- ה-Datasets קטנים (20 + 5 תרחישים) והייתה הרצה אחת לכל מצב, כך שתרחיש אחד משנה אחוז ב-5–20%.
+- את תיקוני הטופס מסעיף 1 מצאנו על אותו Dataset שעליו מדדנו, כך שיש סיכון של התאמת יתר. לדעתנו הסיכון נמוך,
+  כי השינויים נוגעים למבנה הכלי ולא לבאגים מסוימים.
+- ציון סיבת השורש נקבע על ידי שופט LLM, והוא לא מושלם. למשל, הוא נתן 0.5 להסבר נכון ב-`ts-infinite-loop`.
 
-1. The biggest improvement came from **reading the traces**, not from the critique step. Two small tool-schema
-   changes raised hidden-test fix success from 72% to 100%.
-2. `strict` tool use guarantees the **shape** of a tool call, not its **content**.
-3. A critique step costs about 40% more and showed **no measurable benefit** on our scenarios.
-4. The agent can still **overclaim verification**. A reproduction should be required before "verified".
+## סיכום
+
+1. השיפור הגדול הגיע **מקריאת ה-Traces**, לא משלב הביקורת. שני שינויים קטנים במבנה הכלי העלו את הצלחת התיקון
+   בבדיקות הנסתרות מ-72% ל-100%.
+2. `strict` בקריאת כלי מבטיח את **המבנה** של הקריאה, לא את **התוכן** שלה.
+3. שלב ביקורת עולה בערך 40% יותר, ולא הראה **שום תועלת מדידה** בתרחישים שלנו.
+4. הסוכן עדיין יכול **לטעון לאימות בלי בסיס**. צריך לדרוש שחזור לפני "מאומת".

@@ -1,6 +1,7 @@
 """Compare two saved experiments and write a Markdown table (for the README).
 
-    python evaluation/compare_results.py results/baseline-xxxx.json results/improved-xxxx.json
+    python evaluation/compare_results.py A.json B.json [out.md] [label A] [label B]
+    e.g. python evaluation/compare_results.py results/baseline-x.json results/improved-y.json
 """
 
 from __future__ import annotations
@@ -28,25 +29,29 @@ def fmt(value: float | None, key: str) -> str:
     return f"${value:.4f}" if key == "cost_usd" else f"{value:.0%}"
 
 
-def main(base_path: str, improved_path: str) -> None:
-    base, improved = (json.loads(Path(p).read_text(encoding="utf-8")) for p in (base_path, improved_path))
-    lines = ["| Metric | Baseline | Improved | Change |", "|---|---|---|---|"]
+def table(a: dict, b: dict, label_a: str, label_b: str) -> str:
+    lines = [f"| Metric | {label_a} | {label_b} | Change |", "|---|---|---|---|"]
     for key, label in LABELS.items():
-        b, i = base["summary"].get(key), improved["summary"].get(key)
-        if b is None or i is None:
+        x, y = a["summary"].get(key), b["summary"].get(key)
+        if x is None or y is None:
             delta = ""
         else:
-            better = (i < b) if key in LOWER_IS_BETTER else (i > b)
-            delta = "=" if i == b else ("better" if better else "worse")
-        lines.append(f"| {label} | {fmt(b, key)} | {fmt(i, key)} | {delta} |")
-    lines.append(f"| Scenarios | {base['scenarios']} | {improved['scenarios']} | |")
-    lines.append(f"| Total spend (USD) | ${base['total_spend_usd']:.4f} | ${improved['total_spend_usd']:.4f} | |")
-    table = "\n".join(lines)
-    header = f"Experiments: `{base['experiment']}` vs `{improved['experiment']}`\n\n"
-    out = Path(improved_path).with_name("comparison.md")
-    out.write_text(header + table + "\n", encoding="utf-8")
-    print(header + table)
+            better = (y < x) if key in LOWER_IS_BETTER else (y > x)
+            delta = "=" if y == x else ("better" if better else "worse")
+        lines.append(f"| {label} | {fmt(x, key)} | {fmt(y, key)} | {delta} |")
+    lines.append(f"| Scenarios | {a['scenarios']} | {b['scenarios']} | |")
+    lines.append(f"| Total spend (USD) | ${a['total_spend_usd']:.4f} | ${b['total_spend_usd']:.4f} | |")
+    return "\n".join(lines)
+
+
+def main(path_a: str, path_b: str, out: str = "comparison.md", label_a: str = "", label_b: str = "") -> None:
+    a, b = (json.loads(Path(p).read_text(encoding="utf-8")) for p in (path_a, path_b))
+    text = (f"Experiments: `{a['experiment']}` vs `{b['experiment']}`\n\n"
+            f"{table(a, b, label_a or a['mode'].title(), label_b or b['mode'].title())}\n")
+    target = Path(path_b).with_name(out)
+    target.write_text(text, encoding="utf-8", newline="\n")
+    print(text)
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:3])
+    main(*sys.argv[1:6])

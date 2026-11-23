@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bug-investigator"
+version = "0.1.0"
+description = "LLM-driven bug investigation agent built on LangGraph and LangSmith"
+requires-python = ">=3.12"
+dependencies = [
+    "langgraph>=1.2",
+    "langgraph-checkpoint-sqlite>=3.1",
+    "langchain-core>=1.8",
+    "langchain-anthropic>=1.7",
+    "langsmith>=0.16",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.6",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+    "truststore>=0.10",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+investigate = "investigator.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+investigator = ["prompts/*.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

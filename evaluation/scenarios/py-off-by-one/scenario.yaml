@@ -1,0 +1,14 @@
+id: py-off-by-one
+language: Python
+category: off-by-one
+bug:
+  description: >
+    moving_average returns one value too few. For [1, 2, 3, 4] with window 2 I expect
+    [1.5, 2.5, 3.5] but get [1.5, 2.5]. With a window equal to the list length it returns an empty list.
+  error_output: |
+    FAILED tests/test_moving.py::test_window_of_two - assert [1.5, 2.5] == [1.5, 2.5, 3.5]
+    FAILED tests/test_moving.py::test_window_equal_to_length - assert [] == [4.0]
+expected:
+  file: stats/moving.py
+  symbol: moving_average
+  root_cause: The loop uses range(len(values) - window), which stops one window early; it must be range(len(values) - window + 1).

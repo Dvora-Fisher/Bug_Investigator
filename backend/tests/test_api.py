@@ -197,3 +197,30 @@ def test_cancelled_workspace_starts_no_new_container(settings, tmp_path):
     result = runner.run("img", ["npm", "test"], workspace / "project", network=False, timeout_s=5)
     assert not result.ok and "cancelled" in result.output and result.seconds == 0
     runner.unblock(workspace)
+
+
+def test_sandbox_progress_becomes_activity_events(make_client, tmp_path):
+    client = make_client(happy_script())
+    tid = start(client)
+    manager = client.app.state.manager
+    project = (manager.service.settings.workspaces_dir / tid / "project").resolve()
+    manager._on_sandbox(project, {"phase": "start", "command": "npm ci", "network": True})
+    manager._on_sandbox(tmp_path.resolve(), {"phase": "start", "command": "ignored"})  # not a workspace
+    activity = [e for e in manager.events(tid).after(0) if e.kind == "activity"]
+    assert [a.data["command"] for a in activity] == ["npm ci"]
+    assert manager.status(tid) == "waiting_for_human", "activity events must not change the status"
+
+
+def test_docker_runner_reports_start_and_end(settings, tmp_path, monkeypatch):
+    import subprocess
+
+    from investigator.sandbox import docker_runner
+
+    monkeypatch.setattr(docker_runner.subprocess, "run",
+                        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, stdout="ok"))
+    runner = docker_runner.DockerRunner(settings)
+    seen = []
+    runner.add_listener(lambda workdir, data: seen.append((workdir, data["phase"], data.get("exit_code"))))
+    result = runner.run("img", ["npm", "test"], tmp_path, network=False, timeout_s=5)
+    assert result.ok
+    assert seen == [(tmp_path.resolve(), "start", None), (tmp_path.resolve(), "end", 0)]

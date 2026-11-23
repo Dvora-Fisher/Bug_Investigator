@@ -26,7 +26,8 @@ from ..service import InvestigationService
 
 log = logging.getLogger(__name__)
 
-EventKind = Literal["started", "node", "paused", "done", "error", "cancelled"]
+# "activity" = a sandbox command started or ended inside a step (live progress; never ends a segment)
+EventKind = Literal["started", "node", "activity", "paused", "done", "error", "cancelled"]
 Status = Literal["running", "waiting_for_human", "done", "failed", "stopped", "cancelled"]
 TERMINAL: frozenset[str] = frozenset({"paused", "done", "error", "cancelled"})  # a run segment ends with one of these
 
@@ -78,6 +79,18 @@ class RunManager:
         self._logs: dict[str, EventLog] = {}
         self._running: set[str] = set()
         self._cancel_requested: set[str] = set()
+        add_listener = getattr(service.runner, "add_listener", None)
+        if add_listener:
+            add_listener(self._on_sandbox)
+
+    def _on_sandbox(self, workdir: Path, data: dict) -> None:
+        """Sandbox progress (install / test runs can take minutes) -> an 'activity' event of that investigation."""
+        try:
+            thread_id = workdir.relative_to(self.service.settings.workspaces_dir.resolve()).parts[0]
+        except (ValueError, IndexError):
+            return  # not an investigation workspace (e.g. scenario validation)
+        if (self.service.settings.workspaces_dir / thread_id / "meta.json").exists():
+            self.events(thread_id).append("activity", data=data)
 
     # ------------------------------------------------------------------ commands
 

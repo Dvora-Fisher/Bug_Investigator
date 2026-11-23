@@ -134,7 +134,7 @@ export interface Experiment {
   rows: ExperimentRow[];
 }
 
-export interface RunEvent { seq: number; kind: "started" | "node" | "paused" | "done" | "error" | "cancelled"; node: string | null; at: string; data: unknown }
+export interface RunEvent { seq: number; kind: "started" | "node" | "activity" | "paused" | "done" | "error" | "cancelled"; node: string | null; at: string; data: unknown }
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -183,7 +183,7 @@ export function streamEvents(id: string, after: number, onEvent: (e: RunEvent) =
     if (typeof msg.data !== "string") return;
     onEvent({ ...JSON.parse(msg.data), kind: msg.type });
   };
-  for (const kind of ["started", "node", "paused", "done", "error", "cancelled"]) source.addEventListener(kind, handler);
+  for (const kind of ["started", "node", "activity", "paused", "done", "error", "cancelled"]) source.addEventListener(kind, handler);
   // The server ends the stream after a terminal event; EventSource would reconnect forever, so we close.
   source.onerror = () => {
     source.close();

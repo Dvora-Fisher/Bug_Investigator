@@ -19,7 +19,7 @@ import subprocess
 import threading
 import time
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
@@ -61,6 +61,7 @@ class DockerRunner:
         self._lock = threading.Lock()
         self._active: dict[str, Path] = {}  # container name -> workspace it runs in
         self._blocked: set[Path] = set()  # cancelled workspaces: no new container may start there
+        self._listeners: list[Callable[[Path, dict], None]] = []
 
     def kill_under(self, root: Path) -> int:
         """Kill every running container whose workspace is inside `root` and refuse new ones there
@@ -113,18 +114,35 @@ class DockerRunner:
             if any(_inside(workdir.resolve(), b) for b in self._blocked):
                 return ExecResult(shown, None, "[not run: the investigation was cancelled]", True, 0.0)
             self._active[name] = workdir.resolve()
+        self._notify(workdir, {"phase": "start", "command": shown, "network": network, "timeout_s": timeout_s})
+        result: ExecResult | None = None
         try:
             proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                   timeout=timeout_s, encoding="utf-8", errors="replace")
-            return ExecResult(shown, proc.returncode, proc.stdout, False, time.monotonic() - start)
+            result = ExecResult(shown, proc.returncode, proc.stdout, False, time.monotonic() - start)
         except subprocess.TimeoutExpired as exc:
             subprocess.run(["docker", "kill", name], capture_output=True)
             partial = exc.stdout.decode("utf-8", "replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")
-            return ExecResult(shown, None, partial + f"\n[killed after {timeout_s}s]", True,
-                              time.monotonic() - start)
+            result = ExecResult(shown, None, partial + f"\n[killed after {timeout_s}s]", True, time.monotonic() - start)
         finally:
             with self._lock:
                 self._active.pop(name, None)
+            self._notify(workdir, {"phase": "end", "command": shown, "network": network,
+                                   "exit_code": result.exit_code if result else None,
+                                   "timed_out": result.timed_out if result else False,
+                                   "seconds": round(time.monotonic() - start, 1)})
+        return result
+
+    def add_listener(self, listener: Callable[[Path, dict], None]) -> None:
+        """Called with (workdir, data) when a container starts and ends, e.g. to show live progress."""
+        self._listeners.append(listener)
+
+    def _notify(self, workdir: Path, data: dict) -> None:
+        for listener in self._listeners:
+            try:
+                listener(workdir.resolve(), data)
+            except Exception:  # progress reporting must never break a sandbox run
+                log.exception("sandbox listener failed")
 
 
 def _inside(path: Path, root: Path) -> bool:

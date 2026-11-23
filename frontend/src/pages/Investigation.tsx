@@ -1,5 +1,5 @@
 import {
-  Activity, AlertTriangle, ArrowLeft, Ban, OctagonX, Check, CheckCircle2, CircleDot, Clock, Coins, FileSearch, FileText, FlaskConical,
+  Activity, AlertTriangle, ArrowLeft, Ban, Box, OctagonX, Check, CheckCircle2, CircleDot, Clock, Coins, FileSearch, FileText, FlaskConical,
   FolderTree, GitPullRequest, HelpCircle, Lightbulb, MessageSquare, PauseCircle, RotateCcw, Send, ShieldCheck, TestTubes,
   ThumbsDown, ThumbsUp, XCircle,
 } from "lucide-react";
@@ -75,6 +75,7 @@ export default function Investigation() {
   if (!view) return <div className="page"><div className="skeleton" style={{ height: 120, marginBottom: 18 }} /><div className="skeleton" style={{ height: 300 }} /></div>;
 
   const running = view.status === "running";
+  const sandbox = activeSandbox(events);
   const started = new Date(view.meta.created_at).getTime();
   const lastAt = events.length ? new Date(events[events.length - 1].at).getTime() : started;
   const elapsed = Math.max(0, Math.round(((running ? now : lastAt) - started) / 1000));
@@ -126,6 +127,17 @@ export default function Investigation() {
           <PipelineGraph visits={visits} transitions={transitions} current={nodes[nodes.length - 1] ?? null}
             waiting={!!view.pending} running={running} mode={view.meta.mode} />
         </div>
+        {running && sandbox && (
+          <div className="sandbox-strip fade-in">
+            <span className="spinner" />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <b>{sandboxLabel(sandbox.data)}</b>
+              <span className="mono tiny faint" style={{ marginLeft: 10 }}>{sandbox.data.command}</span>
+              {sandbox.data.network && <div className="tiny muted">The first run of a large project can take several minutes. You can cancel at any time.</div>}
+            </div>
+            <span className="mono" style={{ fontSize: 15, fontWeight: 600 }}>{clock((now - new Date(sandbox.at).getTime()) / 1000)}</span>
+          </div>
+        )}
       </section>
 
       {view.status === "cancelled" && (
@@ -485,13 +497,18 @@ function TimelineItem({ e }: { e: RunEvent }) {
     done: { icon: <CheckCircle2 size={11} />, color: "var(--good)" },
     error: { icon: <XCircle size={11} />, color: "var(--bad)" },
     cancelled: { icon: <Ban size={11} />, color: "var(--text-2)" },
+    activity: { icon: <Box size={11} />, color: "#67e8f9" },
   };
   const m = map[e.kind];
   return (
     <div className="tl-item">
       <span className="tl-dot" style={{ color: m.color }}>{m.icon}</span>
       <div>
-        <div style={{ fontWeight: 600 }}>{e.kind === "node" ? NODE_LABELS[e.node ?? ""] ?? e.node : TITLES[e.kind]}</div>
+        <div style={{ fontWeight: 600 }}>
+          {e.kind === "node" ? NODE_LABELS[e.node ?? ""] ?? e.node
+            : e.kind === "activity" ? `Sandbox · ${sandboxLabel(e.data as SandboxData)}${(e.data as SandboxData).phase === "end" ? " — done" : ""}`
+            : TITLES[e.kind]}
+        </div>
         <div className="tiny muted">{describe(e)}</div>
       </div>
       <span className="tiny faint mono">{t}</span>
@@ -499,7 +516,30 @@ function TimelineItem({ e }: { e: RunEvent }) {
   );
 }
 
-const TITLES = { started: "Run started", paused: "Paused for review", done: "Investigation finished", error: "Error", cancelled: "Cancelled", node: "" };
+const TITLES = { started: "Run started", paused: "Paused for review", done: "Investigation finished", error: "Error", cancelled: "Cancelled", node: "", activity: "" };
+
+type SandboxData = { phase: "start" | "end"; command: string; network?: boolean; exit_code?: number | null; timed_out?: boolean; seconds?: number };
+
+/** The sandbox command that is running right now (a start event with no matching end yet), if any. */
+function activeSandbox(events: RunEvent[]): (RunEvent & { data: SandboxData }) | null {
+  let open: (RunEvent & { data: SandboxData }) | null = null;
+  for (const e of events) {
+    if (e.kind !== "activity") continue;
+    const d = e.data as SandboxData;
+    open = d.phase === "start" ? (e as RunEvent & { data: SandboxData }) : null;
+  }
+  return open;
+}
+
+function sandboxLabel(d: SandboxData): string {
+  if (d.network) return "Installing dependencies";
+  return /\btest\b|pytest|dotnet test|jest|vitest/.test(d.command) ? "Running tests" : "Running a command";
+}
+
+function clock(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
 
 function describe(e: RunEvent): string {
   const d = (e.data ?? {}) as Record<string, any>;
@@ -508,6 +548,11 @@ function describe(e: RunEvent): string {
   if (e.kind === "paused") return d.type === "clarification" ? "The agent asks why the fix was rejected" : "A fix is ready for your decision";
   if (e.kind === "done") return "Report ready";
   if (e.kind === "cancelled") return "Stopped by you · no changes made";
+  if (e.kind === "activity") {
+    const s = d as SandboxData;
+    return s.phase === "start" ? s.command
+      : `${s.command} · ${clock(s.seconds ?? 0)} · ${s.timed_out ? "stopped" : s.exit_code === 0 ? "ok" : `exit ${s.exit_code}`}`;
+  }
   if (d.halt_reason) return `Stopped: ${d.halt_reason}`;
   switch (e.node) {
     case "analyze_bug": return d.language ? `Language: ${d.language}` : "Bug report summarized";

@@ -368,7 +368,7 @@ h3 { font-size: 13.5px; margin: 0; font-weight: 600; }
 @keyframes lens {
   0% { transform: translate(210px, 130px); }
   25% { transform: translate(330px, 150px); }
-  45%, 70% { transform: translate(372px, 219px); }
+  45%, 70% { transform: translate(372px, 210px); }
   85% { transform: translate(250px, 250px); }
   100% { transform: translate(210px, 130px); }
 }
@@ -376,15 +376,15 @@ h3 { font-size: 13.5px; margin: 0; font-weight: 600; }
 @keyframes scan { 0%, 100% { transform: translateY(-40px); } 50% { transform: translateY(40px); } }
 .ha-hot { animation: hot 9s ease-in-out infinite; }
 @keyframes hot { 0%, 40% { opacity: 0; } 50%, 72% { opacity: 1; } 85%, 100% { opacity: 0; } }
-.ha-bug { animation: wiggle 0.6s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
-@keyframes wiggle { from { rotate: -6deg; } to { rotate: 6deg; } }
+.ha-bug { animation: wiggle 1.8s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 90%; }
+@keyframes wiggle { from { rotate: -4deg; translate: 0 0; } to { rotate: 4deg; translate: 0 -2px; } }
 .ha-pulse { animation: pulse 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes pulse { 0%, 100% { scale: 1; opacity: 0.7; } 50% { scale: 1.35; opacity: 1; } }
 .ha-float { animation: float 5s ease-in-out infinite; }
 @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 @media (prefers-reduced-motion: reduce) {
   .ha-lens, .ha-scan, .ha-hot, .ha-bug, .ha-pulse, .ha-float, .dot.live, .flow, .pnode.active rect.frame { animation: none; }
-  .ha-lens { transform: translate(372px, 219px); }
+  .ha-lens { transform: translate(372px, 210px); }
 }
 .home-charts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr); gap: 18px; }
 .donut-legend { display: grid; gap: 8px; }
@@ -396,4 +396,10 @@ h3 { font-size: 13.5px; margin: 0; font-weight: 600; }
 @media (max-width: 1100px) {
   .hero { grid-template-columns: 1fr; }
   .home-charts { grid-template-columns: 1fr; }
+}
+
+/* live sandbox progress under the investigation graph */
+.sandbox-strip {
+  display: flex; align-items: center; gap: 14px; margin: 4px 18px 16px; padding: 12px 16px; border-radius: 12px;
+  background: linear-gradient(90deg, rgba(34, 211, 238, 0.1), rgba(139, 92, 246, 0.06)); border: 1px solid rgba(34, 211, 238, 0.28);
 }

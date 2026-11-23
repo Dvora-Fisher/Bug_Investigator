@@ -1,0 +1,22 @@
+id: ts-hard-cache-collision
+language: TypeScript
+category: logic-error
+difficulty: hard
+bug:
+  description: >
+    A few customers reported that the "My orders" page sometimes showed orders that were not theirs.
+    It is rare, there are no errors in the logs, and we could not reproduce it with our test accounts.
+    The security team suspects the auth/session code.
+  error_output: ""
+expected:
+  file: src/orders/orderService.ts
+  symbol: ordersPage
+  root_cause: >
+    ordersPage builds its cache key as `orders:${userId}${page}` with no separator, so different
+    (user, page) pairs produce the same key (user 1 page 12 and user 11 page 2 are both "orders:112")
+    and one user is served another user's cached page. The auth/session code is not involved.
+  fix: Put a separator between the parts of the cache key, e.g. `orders:${userId}:${page}`.
+reference_fix:
+  - path: src/orders/orderService.ts
+    old: 'const key = `orders:${userId}${page}`;'
+    new: 'const key = `orders:${userId}:${page}`;'

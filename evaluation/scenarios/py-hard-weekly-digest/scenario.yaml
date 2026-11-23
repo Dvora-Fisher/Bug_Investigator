@@ -1,0 +1,20 @@
+id: py-hard-weekly-digest
+language: Python
+category: logic-error
+difficulty: hard
+bug:
+  description: >
+    Some users never receive the weekly digest email. There are no errors in the logs,
+    and other users get it.
+  error_output: ""
+expected:
+  file: digest/scheduler.py
+  symbol: due_users
+  root_cause: >
+    due_users compares the stored digest_day (ISO weekday, Monday=1 .. Sunday=7) with datetime.weekday(),
+    which is Monday=0 .. Sunday=6. Everyone is shifted by one day and users who chose Sunday (7) never match.
+  fix: Use now.isoweekday() (or compare with weekday() + 1) in due_users.
+reference_fix:
+  - path: digest/scheduler.py
+    old: "today = now.weekday()"
+    new: "today = now.isoweekday()"

@@ -1,0 +1,26 @@
+id: py-hard-money-rounding
+language: Python
+category: logic-error
+difficulty: hard
+bug:
+  description: >
+    The monthly billing report shows some customers' totals one cent lower than their invoices
+    (for example $19.98 instead of $19.99). It does not happen for every customer or every amount.
+    Our CI run of the report tests failed with the output below.
+  error_output: |
+    FAILED tests/test_reports_ci.py::test_single_item_customer - AssertionError
+        def test_single_item_customer():
+    >       assert monthly_report({"Dana": [LineItem("SKU-1", "Annual plan", 19.99)]}) == ["Dana: $19.99"]
+    E       AssertionError: assert ['Dana: $19.98'] == ['Dana: $19.99']
+    billing/report.py:14: in monthly_report
+expected:
+  file: billing/normalize.py
+  symbol: to_cents
+  root_cause: >
+    to_cents converts with int(amount * 100); floating point makes 19.99 * 100 = 1998.9999999999998 and int()
+    truncates it to 1998, so totals lose a cent. The report module only shows the symptom.
+  fix: Round instead of truncating in to_cents (round(amount * 100)), or convert via Decimal.
+reference_fix:
+  - path: billing/normalize.py
+    old: "return int(amount * 100)"
+    new: "return round(amount * 100)"

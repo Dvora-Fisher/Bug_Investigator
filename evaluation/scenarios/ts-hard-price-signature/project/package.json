@@ -1,0 +1,9 @@
+{
+  "name": "shop-pricing",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types --no-warnings --test \"test/*.test.ts\""
+  }
+}

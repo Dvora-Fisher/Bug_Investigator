@@ -1,0 +1,34 @@
+id: ts-hard-price-signature
+language: TypeScript
+category: regression
+difficulty: hard
+bug:
+  description: >
+    Since the v2.0.0 release the cart page and the PDF invoices show prices like "19.98 NaN"
+    instead of "$19.98". Order-confirmation emails still show prices correctly.
+  error_output: |
+    Cart page (USD) rendered:
+      2 x Mug: 19.98 NaN
+      Total: 19.98 NaN
+expected:
+  file:
+    - src/cart.ts
+    - src/invoice.ts
+  root_cause: >
+    v2.0.0 changed formatPrice to (currency, amount), but cart.ts and invoice.ts still call it with the old
+    (amount, currency) order, so the amount is treated as the currency code and the currency as the amount (NaN).
+    email.ts already uses the new order, so the signature itself must not be reverted.
+  fix: Update the formatPrice calls in src/cart.ts and src/invoice.ts to pass (currency, amount).
+reference_fix:
+  - path: src/cart.ts
+    old: 'formatPrice(i.price * i.qty, currency)'
+    new: 'formatPrice(currency, i.price * i.qty)'
+  - path: src/cart.ts
+    old: 'formatPrice(cartTotal(items), currency)'
+    new: 'formatPrice(currency, cartTotal(items))'
+  - path: src/invoice.ts
+    old: 'formatPrice(l.amount, invoice.currency)'
+    new: 'formatPrice(invoice.currency, l.amount)'
+  - path: src/invoice.ts
+    old: 'formatPrice(total, invoice.currency)'
+    new: 'formatPrice(invoice.currency, total)'

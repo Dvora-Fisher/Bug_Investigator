@@ -1,0 +1,28 @@
+id: py-hard-misleading-trace
+language: Python
+category: regression
+difficulty: hard
+bug:
+  description: >
+    Since release 1.4.0, opening the profile of a deactivated user returns HTTP 500. Active users work fine.
+    1.4.0 renamed the API field to is_active in the serializer (see CHANGELOG.md), so we think that serializer
+    change is broken.
+  error_output: |
+    Traceback (most recent call last):
+      File "/srv/app/accounts/api.py", line 7, in get_user
+        return 200, to_api(service.repo.get(uid))
+      File "/srv/app/accounts/serializer.py", line 9, in to_api
+        "is_active": user["is_active"],
+    KeyError: 'is_active'
+expected:
+  file: accounts/repository.py
+  symbol: clean
+  root_cause: >
+    The serializer is correct. repository.clean() keeps only truthy values (if v), so is_active=False
+    (and any 0 / "" value) is silently dropped when the user is saved; the serializer then finds no key.
+    clean() should drop only None.
+  fix: Change clean() to keep every value that is not None (if v is not None).
+reference_fix:
+  - path: accounts/repository.py
+    old: "if v}"
+    new: "if v is not None}"

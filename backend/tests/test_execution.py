@@ -37,6 +37,19 @@ def test_verified_fix_end_to_end(make_service, sample_project):
     assert all(not net for cmd, net in runner.calls if not cmd.startswith("sh -c"))
 
 
+def test_passing_tests_without_reproduction_are_not_verified(make_service, settings, sample_project):
+    settings.max_hypothesis_rounds = 1  # go straight to the fix after the failed reproduction
+    not_reproduced = ReproductionReport(reproduced=False, method="could not trigger the bug", evidence_ids=["E2"])
+    runner = FakeRunner({"python -m pytest": [exec_result(0, "2 passed"), exec_result(0, "2 passed")]})
+    service = make_service(happy_script(reproduce_bug=[lambda tools: not_reproduced]), runner)
+    tid = run_until_pause(service, sample_project)
+    list(service.resume(tid, ReviewDecision(decision="approve")))
+    report = service.snapshot(tid).values["report"]
+
+    assert report.outcome == "fixed_unverified"
+    assert any("never reproduced" in n for n in report.notes)
+
+
 def test_failed_fix_loops_back_to_propose(make_service, sample_project):
     runner = FakeRunner({"python -m pytest": [FAILING, FAILING, exec_result(0)]})
     service = make_service(happy_script(reproduce_bug=[reproduced_by_suite], propose_fix=[fix(), fix()]), runner)

@@ -42,6 +42,9 @@ def final_report(state: InvestigationState, runtime: Rt) -> dict:
                      f"(runtime: {profile.runtime or 'none detected'}).")
     if repro and repro.attempted and not repro.reproduced:
         notes.append("The bug could not be reproduced; the diagnosis rests on code reading only.")
+    if applied and latest_verification(state) and not _reproduced(state):
+        notes.append("The tests pass after the fix, but the bug was never reproduced, so they may not exercise it: "
+                     "the fix is NOT verified.")
     if suite_failed_for_other_reasons(state):
         notes.append("The project's test suite was already failing before the fix for reasons other than this bug, "
                      "so it could not confirm the fix; verification relied on the reproduction command.")
@@ -73,4 +76,12 @@ def _outcome(state: InvestigationState, applied: bool) -> str:
     verified = latest_verification(state)
     if verified is None:
         return "fixed_unverified"
+    if verified and not _reproduced(state):
+        # Passing tests prove nothing about this bug if no run ever showed the bug happening.
+        return "fixed_unverified"
     return "fixed_and_verified" if verified else "fix_failed"
+
+
+def _reproduced(state: InvestigationState) -> bool:
+    repro = state.get("reproduction")
+    return bool(repro and repro.reproduced)

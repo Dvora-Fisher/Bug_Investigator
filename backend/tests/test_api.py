@@ -4,6 +4,8 @@ Uses the scripted reasoner and no Docker, so it is fast and free."""
 from __future__ import annotations
 
 import io
+import threading
+import time
 import json
 import zipfile
 
@@ -12,7 +14,7 @@ from fastapi.testclient import TestClient
 
 from investigator.api.app import create_app
 
-from .test_graph import fix, happy_script
+from .test_graph import HYPOTHESES, fix, happy_script
 
 
 @pytest.fixture
@@ -138,3 +140,60 @@ def test_samples_and_health(make_client):
     assert {"py-off-by-one", "ts-null-reference", "cs-logic-error"} <= ids
     health = client.get("/api/health").json()
     assert health["monthly_budget_usd"] == 15 and health["docker"] is False
+
+
+def test_evaluation_lists_saved_experiments_without_pilots(make_client):
+    experiments = make_client(happy_script()).get("/api/evaluation").json()
+    names = [e["name"] for e in experiments]
+    assert "baseline-hard-927e30bd" in names and not any("pilot" in n for n in names)
+    hard = next(e for e in experiments if e["name"] == "improved-hard-95a26917")
+    assert hard["difficulty"] == "hard" and hard["summary"]["fix_success"] == 0.8 and len(hard["rows"]) == 5
+
+
+def test_cancel_a_paused_investigation(make_client):
+    client = make_client(happy_script())
+    tid = start(client)  # pauses for the fix review
+    r = client.post(f"/api/investigations/{tid}/cancel")
+    assert r.status_code == 202 and r.json()["status"] == "cancelled"
+
+    view = client.get(f"/api/investigations/{tid}").json()
+    assert view["status"] == "cancelled" and view["pending"] is None and view["report"] is None
+    resume(client, tid, {"decision": "approve"}, expect=409)  # a cancelled investigation cannot continue
+    assert client.post(f"/api/investigations/{tid}/cancel").status_code == 409
+    assert next(i for i in client.get("/api/investigations").json() if i["thread_id"] == tid)["status"] == "cancelled"
+
+
+def test_cancel_a_running_investigation_stops_at_the_next_step(make_client):
+    release = threading.Event()
+
+    def slow_hypotheses(tools):
+        release.wait(5)
+        return HYPOTHESES
+
+    reasoner = happy_script(generate_hypotheses=[slow_hypotheses])
+    client = make_client(reasoner)
+    r = client.post("/api/investigations", data={"description": "moving_average returns one value too few",
+                                                 "source_type": "sample", "sample_id": "py-off-by-one"})
+    tid = r.json()["thread_id"]
+    deadline = time.monotonic() + 5
+    while "generate_hypotheses" not in reasoner.calls and time.monotonic() < deadline:
+        time.sleep(0.01)  # cancel while that step is in progress
+    assert client.post(f"/api/investigations/{tid}/cancel").json()["status"] == "running"
+    release.set()
+    view = wait(client, tid)
+    assert view["status"] == "cancelled" and view["report"] is None and view["proposed_fix"] is None
+    nodes = [e["node"] for e in map(json.loads, (client.app.state.manager.service.settings.workspaces_dir / tid
+                                                 / "events.jsonl").read_text().splitlines()) if e["kind"] == "node"]
+    assert nodes[-1] == "generate_hypotheses", "no step may run after the one in progress"
+
+
+def test_cancelled_workspace_starts_no_new_container(settings, tmp_path):
+    from investigator.sandbox.docker_runner import DockerRunner
+
+    runner = DockerRunner(settings)
+    workspace = tmp_path / "ws"
+    (workspace / "project").mkdir(parents=True)
+    assert runner.kill_under(workspace) == 0
+    result = runner.run("img", ["npm", "test"], workspace / "project", network=False, timeout_s=5)
+    assert not result.ok and "cancelled" in result.output and result.seconds == 0
+    runner.unblock(workspace)

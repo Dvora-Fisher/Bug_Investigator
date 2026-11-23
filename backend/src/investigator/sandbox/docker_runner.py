@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
+import threading
 import time
 import uuid
 from collections.abc import Mapping, Sequence
@@ -57,6 +58,24 @@ class ExecResult:
 class DockerRunner:
     def __init__(self, settings: Settings):
         self._s = settings
+        self._lock = threading.Lock()
+        self._active: dict[str, Path] = {}  # container name -> workspace it runs in
+        self._blocked: set[Path] = set()  # cancelled workspaces: no new container may start there
+
+    def kill_under(self, root: Path) -> int:
+        """Kill every running container whose workspace is inside `root` and refuse new ones there
+        (used when a user cancels). Interrupted runs return a failure to their caller. Returns the kill count."""
+        root = root.resolve()
+        with self._lock:
+            self._blocked.add(root)
+            names = [n for n, w in self._active.items() if _inside(w, root)]
+        for name in names:
+            subprocess.run(["docker", "kill", name], capture_output=True)
+        return len(names)
+
+    def unblock(self, root: Path) -> None:
+        with self._lock:
+            self._blocked.discard(root.resolve())
 
     @cached_property
     def available(self) -> bool:
@@ -90,6 +109,10 @@ class DockerRunner:
         shown = " ".join(argv)
         log.info("sandbox run (network=%s): %s", network, shown)
         start = time.monotonic()
+        with self._lock:
+            if any(_inside(workdir.resolve(), b) for b in self._blocked):
+                return ExecResult(shown, None, "[not run: the investigation was cancelled]", True, 0.0)
+            self._active[name] = workdir.resolve()
         try:
             proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                   timeout=timeout_s, encoding="utf-8", errors="replace")
@@ -99,3 +122,10 @@ class DockerRunner:
             partial = exc.stdout.decode("utf-8", "replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")
             return ExecResult(shown, None, partial + f"\n[killed after {timeout_s}s]", True,
                               time.monotonic() - start)
+        finally:
+            with self._lock:
+                self._active.pop(name, None)
+
+
+def _inside(path: Path, root: Path) -> bool:
+    return path == root or root in path.parents

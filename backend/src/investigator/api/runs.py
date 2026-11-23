@@ -26,9 +26,9 @@ from ..service import InvestigationService
 
 log = logging.getLogger(__name__)
 
-EventKind = Literal["started", "node", "paused", "done", "error"]
-Status = Literal["running", "waiting_for_human", "done", "failed", "stopped"]
-TERMINAL: frozenset[str] = frozenset({"paused", "done", "error"})  # a run segment ends with one of these
+EventKind = Literal["started", "node", "paused", "done", "error", "cancelled"]
+Status = Literal["running", "waiting_for_human", "done", "failed", "stopped", "cancelled"]
+TERMINAL: frozenset[str] = frozenset({"paused", "done", "error", "cancelled"})  # a run segment ends with one of these
 
 
 @dataclass(frozen=True)
@@ -77,6 +77,7 @@ class RunManager:
         self._lock = threading.Lock()
         self._logs: dict[str, EventLog] = {}
         self._running: set[str] = set()
+        self._cancel_requested: set[str] = set()
 
     # ------------------------------------------------------------------ commands
 
@@ -87,11 +88,40 @@ class RunManager:
         """Validate the answer now (so the caller gets an error immediately), then continue in background."""
         if self.is_running(thread_id):
             raise RunInProgress(thread_id)
+        if self.is_cancelled(thread_id):
+            raise Cancelled(thread_id)
         value = self.service.validate_resume(thread_id, answer)
         self._launch(thread_id, lambda: self.service.resume(thread_id, value), "started",
                      {"resumed_with": value.model_dump()})
 
+    def cancel(self, thread_id: str) -> Status:
+        """Stop an investigation at the user's request.
+
+        A running investigation stops at the next step boundary. A sandbox container that is running for it
+        is killed at once; an LLM call in progress is allowed to finish (seconds). A paused one is closed at once.
+        Nothing is ever applied to the code by cancelling. Returns the resulting status.
+        """
+        with self._lock:
+            running = thread_id in self._running
+            if running:
+                self._cancel_requested.add(thread_id)
+        if running:
+            # Do not wait minutes for an install or test run to end: kill its sandbox container now.
+            kill = getattr(self.service.runner, "kill_under", None)
+            if kill:
+                kill(self.service.settings.workspaces_dir / thread_id)
+            return "running"
+        status = self.status(thread_id)
+        if status in ("done", "failed", "cancelled"):
+            raise NotCancellable(thread_id, status)
+        self.events(thread_id).append("cancelled", data={"message": "Cancelled by the user", "while": status})
+        return "cancelled"
+
     # ------------------------------------------------------------------ queries
+
+    def is_cancelled(self, thread_id: str) -> bool:
+        last = self.events(thread_id).last
+        return bool(last and last.kind == "cancelled")
 
     def is_running(self, thread_id: str) -> bool:
         with self._lock:
@@ -107,6 +137,8 @@ class RunManager:
     def status(self, thread_id: str) -> Status:
         if self.is_running(thread_id):
             return "running"
+        if self.is_cancelled(thread_id):
+            return "cancelled"
         snapshot = self.service.snapshot(thread_id)
         if any(task.interrupts for task in snapshot.tasks):
             return "waiting_for_human"
@@ -142,15 +174,34 @@ class RunManager:
                 for node, data in update.items():
                     if node != "__interrupt__":
                         events.append("node", node, data)
-            pause = self.service.pending_interrupt(thread_id)
-            events.append("paused" if pause else "done", data=pause)
+                if thread_id in self._cancel_requested:
+                    break  # leaving the loop closes the graph stream: no further step runs
+            if thread_id in self._cancel_requested:
+                events.append("cancelled", data={"message": "Cancelled by the user", "while": "running"})
+            else:
+                pause = self.service.pending_interrupt(thread_id)
+                events.append("paused" if pause else "done", data=pause)
         except Exception as exc:  # report every failure to the client instead of losing it in a thread
             log.exception("investigation %s failed", thread_id)
             events.append("error", data={"message": f"{type(exc).__name__}: {exc}"})
         finally:
             with self._lock:
                 self._running.discard(thread_id)
+                self._cancel_requested.discard(thread_id)
+            unblock = getattr(self.service.runner, "unblock", None)
+            if unblock:
+                unblock(self.service.settings.workspaces_dir / thread_id)
 
 
 class RunInProgress(RuntimeError):
     """The investigation is already running; wait for it to pause or finish."""
+
+
+class Cancelled(RuntimeError):
+    """The investigation was cancelled by the user and cannot continue."""
+
+
+class NotCancellable(RuntimeError):
+    def __init__(self, thread_id: str, status: str):
+        super().__init__(f"Investigation is already {status}")
+        self.status = status

@@ -27,6 +27,9 @@ class InvestigationMeta(BaseModel):
 
 class InvestigationSummary(InvestigationMeta):
     status: Status
+    language: str | None = None
+    outcome: str | None = None  # FinalReport.outcome once the investigation has finished
+    cost_usd: float = 0.0
 
 
 class InvestigationView(BaseModel):
@@ -66,6 +69,24 @@ class Health(BaseModel):
     sandbox_images: dict[str, bool]
     month_spend_usd: float
     monthly_budget_usd: float
+
+
+class ExperimentRow(BaseModel):
+    scenario: str
+    language: str
+    scores: dict[str, float | None]
+    outcome: str | None = None
+
+
+class Experiment(BaseModel):
+    name: str
+    mode: Literal["baseline", "improved"]
+    difficulty: Literal["basic", "hard"]
+    finished_at: datetime
+    scenarios: int
+    total_spend_usd: float
+    summary: dict[str, float | None]
+    rows: list[ExperimentRow]
 
 
 class Accepted(BaseModel):

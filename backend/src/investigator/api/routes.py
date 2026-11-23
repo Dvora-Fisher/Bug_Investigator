@@ -5,8 +5,10 @@ GET  /api/investigations                 list investigations
 GET  /api/investigations/{id}            current state, status and pending pause (if any)
 GET  /api/investigations/{id}/events     live progress as server-sent events (replayable with ?after=N)
 POST /api/investigations/{id}/resume     answer the pending pause -> graph continues via Command(resume=...)
+POST /api/investigations/{id}/cancel     stop it (kills its sandbox container; nothing is applied)
 GET  /api/investigations/{id}/file       read one project file (for the UI's file viewer)
 GET  /api/samples, /api/health
+GET  /api/evaluation                     saved LangSmith experiment results (for the evaluation dashboard)
 """
 
 from __future__ import annotations
@@ -30,12 +32,14 @@ from ..runtimes.adapters import ADAPTERS
 from ..sandbox.sources import GitHubSource, LocalSource, ProjectSource, ZipSource
 from ..sandbox.workspace import Workspace, WorkspaceError
 from ..service import NotWaitingForHuman
-from .runs import TERMINAL, RunInProgress, RunManager
+from .runs import TERMINAL, Cancelled, NotCancellable, RunInProgress, RunManager
 from .schemas import (
-    Accepted, Health, InvestigationMeta, InvestigationSummary, InvestigationView, Sample, SourceType,
+    Accepted, Experiment, ExperimentRow, Health, InvestigationMeta, InvestigationSummary, InvestigationView, Sample,
+    SourceType,
 )
 
 SCENARIOS_DIR = ROOT_DIR / "evaluation" / "scenarios"
+RESULTS_DIR = ROOT_DIR / "evaluation" / "results"
 # Thread ids are uuid4 hex. Validating the pattern stops ids like "..%2F.." from reaching the file system.
 ThreadId = Annotated[str, PathParam(pattern=r"^[0-9a-f]{32}$")]
 
@@ -87,16 +91,23 @@ def create_investigation(
 @router.get("/investigations", response_model=list[InvestigationSummary])
 def list_investigations(runs: Manager) -> list[InvestigationSummary]:
     metas = [_read_meta(p) for p in runs.service.settings.workspaces_dir.glob("*/meta.json")]
-    return [InvestigationSummary(**m.model_dump(), status=runs.status(m.thread_id))
-            for m in sorted(metas, key=lambda m: m.created_at, reverse=True)]
+    summaries = []
+    for m in sorted(metas, key=lambda m: m.created_at, reverse=True):
+        values = runs.service.snapshot(m.thread_id).values
+        report = values.get("report")
+        summaries.append(InvestigationSummary(
+            **m.model_dump(), status=runs.status(m.thread_id), language=values.get("language"),
+            outcome=report.outcome if report else None, cost_usd=runs.service.cost_usd(m.thread_id)))
+    return summaries
 
 
 @router.get("/investigations/{thread_id}", response_model=InvestigationView)
 def get_investigation(thread_id: ThreadId, runs: Manager) -> InvestigationView:
     meta = _meta_or_404(runs, thread_id)
     values = runs.service.snapshot(thread_id).values
+    current = runs.status(thread_id)
     return InvestigationView(
-        meta=meta, status=runs.status(thread_id), pending=runs.service.pending_interrupt(thread_id),
+        meta=meta, status=current, pending=runs.service.pending_interrupt(thread_id) if current != "cancelled" else None,
         cost_usd=runs.service.cost_usd(thread_id),
         **{k: v for k, v in values.items() if k in InvestigationView.model_fields},
     )
@@ -136,11 +147,23 @@ def resume_investigation(thread_id: ThreadId, answer: dict, runs: Manager) -> Ac
     _meta_or_404(runs, thread_id)
     try:
         runs.resume(thread_id, answer)
-    except (NotWaitingForHuman, RunInProgress) as exc:
+    except (NotWaitingForHuman, RunInProgress, Cancelled) as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc) or "Investigation is running") from exc
     except ValidationError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, exc.errors(include_url=False)) from exc
     return Accepted(thread_id=thread_id, status="running")
+
+
+@router.post("/investigations/{thread_id}/cancel", status_code=status.HTTP_202_ACCEPTED, response_model=Accepted)
+def cancel_investigation(thread_id: ThreadId, runs: Manager) -> Accepted:
+    """Stop an investigation. Running: its sandbox container is killed and the graph stops at the next
+    step ("running" until then, then "cancelled"). Waiting for review: closed at once, nothing is applied."""
+    _meta_or_404(runs, thread_id)
+    try:
+        result = runs.cancel(thread_id)
+    except NotCancellable as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    return Accepted(thread_id=thread_id, status=result)
 
 
 @router.get("/investigations/{thread_id}/file", response_class=PlainTextResponse)
@@ -164,6 +187,24 @@ def list_samples() -> list[Sample]:
                               description=spec["bug"]["description"].strip(),
                               error_output=(spec["bug"].get("error_output") or "").strip()))
     return samples
+
+
+@router.get("/evaluation", response_model=list[Experiment])
+def list_experiments() -> list[Experiment]:
+    """Saved LangSmith experiment results (evaluation/results/*.json), oldest first. Pilot runs are skipped."""
+    experiments = []
+    for path in sorted(RESULTS_DIR.glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if "-pilot" in data["experiment"]:
+            continue
+        experiments.append(Experiment(
+            name=data["experiment"], mode=data["mode"], finished_at=data["finished_at"],
+            difficulty="hard" if "-hard" in data["experiment"] else "basic", scenarios=data["scenarios"],
+            total_spend_usd=data["total_spend_usd"], summary=data["summary"],
+            rows=[ExperimentRow(scenario=r["scenario"], language=r["language"], scores=r["scores"],
+                                outcome=(r.get("outputs") or {}).get("outcome")) for r in data["rows"]],
+        ))
+    return sorted(experiments, key=lambda e: e.finished_at)
 
 
 @router.get("/health", response_model=Health)

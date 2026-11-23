@@ -24,10 +24,11 @@ def _leaf(symbol: str) -> str:
 
 
 def file_localization(outputs: dict, reference_outputs: dict) -> dict:
-    """Did the agent point at the right file (in its fix, or in its leading hypothesis)?"""
-    expected = _norm(reference_outputs["file"])
+    """Share of the buggy files the agent pointed at (in its fix, or in its leading hypothesis)."""
+    expected = reference_outputs["file"]
+    expected = {_norm(f) for f in (expected if isinstance(expected, list) else [expected])}
     found = {_norm(f) for f in outputs.get("files", [])} | {_norm(outputs.get("leading_file", ""))}
-    return {"key": "file_localization", "score": float(expected in found)}
+    return {"key": "file_localization", "score": len(expected & found) / len(expected)}
 
 
 def function_localization(outputs: dict, reference_outputs: dict) -> dict:

@@ -29,6 +29,12 @@ def test_file_localization_accepts_fix_or_leading_hypothesis():
     assert file_localization({"files": ["src/Other.cs"], "leading_file": ""}, REF)["score"] == 0.0
 
 
+def test_file_localization_with_several_buggy_files():
+    ref = {**REF, "file": ["src/cart.ts", "src/invoice.ts"]}
+    assert file_localization({"files": ["src/cart.ts", "src/invoice.ts"]}, ref)["score"] == 1.0
+    assert file_localization({"files": ["src/cart.ts"]}, ref)["score"] == 0.5
+
+
 def test_function_localization():
     assert function_localization({"leading_symbol": "CustomerService.DisplayName"}, REF)["score"] == 1.0
     assert function_localization({"leading_symbol": "", "fix_diff": "public string DisplayName(int id)"},
@@ -84,7 +90,8 @@ def test_every_scenario_is_well_formed():
     for s in scenarios:
         assert s.id == s.dir.name
         assert {"file", "root_cause", "fix"} <= set(s.expected)
-        assert (s.project_dir / s.expected["file"]).is_file(), s.id
+        assert all((s.project_dir / f).is_file() for f in s.expected_files), s.id
+        assert s.difficulty in {"basic", "hard"}, s.id
         assert s.reference_fix and (not s.runnable or s.hidden_dir.is_dir()), s.id
     languages = {s.spec["language"] for s in scenarios}
     assert {"Python", "C#", "JavaScript", "TypeScript"} <= languages

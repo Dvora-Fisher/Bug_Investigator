@@ -54,6 +54,16 @@ class Scenario:
         return self.spec["expected"]
 
     @property
+    def expected_files(self) -> list[str]:
+        """One file for most bugs; a list when the fix must touch several files."""
+        files = self.expected["file"]
+        return files if isinstance(files, list) else [files]
+
+    @property
+    def difficulty(self) -> str:
+        return self.spec.get("difficulty", "basic")
+
+    @property
     def reference_fix(self) -> list[FileEdit]:
         return [FileEdit(**e) for e in self.spec["reference_fix"]]
 
@@ -77,8 +87,10 @@ class Scenario:
         return copied
 
 
-def load_scenarios(ids: list[str] | None = None) -> list[Scenario]:
+def load_scenarios(ids: list[str] | None = None, difficulty: str | None = None) -> list[Scenario]:
     scenarios = [Scenario(p.parent) for p in sorted(SCENARIOS_DIR.glob("*/scenario.yaml"))]
+    if difficulty:
+        scenarios = [s for s in scenarios if s.difficulty == difficulty]
     if ids:
         unknown = set(ids) - {s.id for s in scenarios}
         if unknown:

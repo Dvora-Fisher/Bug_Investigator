@@ -134,6 +134,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=["baseline", "improved"], required=True)
     parser.add_argument("--only", nargs="*", help="scenario ids (pilot run)")
+    parser.add_argument("--difficulty", choices=["basic", "hard"], help="run only scenarios of this difficulty")
     parser.add_argument("--concurrency", type=int, default=2)
     args = parser.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
@@ -143,15 +144,17 @@ def main() -> int:
     from langsmith import Client, evaluate
 
     service = InvestigationService(settings, checkpointer=InMemorySaver(serde=checkpoint_serializer()))
-    scenarios = {s.id: s for s in load_scenarios(args.only)}
+    scenarios = {s.id: s for s in load_scenarios(args.only, args.difficulty)}
     client = Client()
     data = [e for e in client.list_examples(dataset_name=DATASET_NAME) if e.inputs["scenario_id"] in scenarios]
     spent_before = service.ledger.month_spend_usd()
 
     results = evaluate(
         make_target(service, scenarios, args.mode), data=data, evaluators=EVALUATORS, client=client,
-        experiment_prefix=f"{args.mode}{'-pilot' if args.only else ''}", max_concurrency=args.concurrency,
-        metadata={"mode": args.mode, "model": settings.llm_model, "scenarios": len(data)},
+        experiment_prefix=f"{args.mode}{'-pilot' if args.only else ''}{'-' + args.difficulty if args.difficulty else ''}",
+        max_concurrency=args.concurrency,
+        metadata={"mode": args.mode, "model": settings.llm_model, "scenarios": len(data),
+                  "difficulty": args.difficulty or "all"},
         description=f"{args.mode} investigation flow on {len(data)} scenarios",
     )
     save_results(results, args.mode, service.ledger.month_spend_usd() - spent_before)

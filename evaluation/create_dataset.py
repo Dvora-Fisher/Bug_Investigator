@@ -26,7 +26,8 @@ def examples() -> list[dict]:
             "outputs": {"file": s.expected["file"], "symbol": s.expected.get("symbol", ""),
                         "root_cause": s.expected["root_cause"], "fix": s.expected["fix"],
                         "runnable": s.runnable},
-            "metadata": {"category": s.spec["category"], "language": s.spec["language"]},
+            "metadata": {"category": s.spec["category"], "language": s.spec["language"],
+                         "difficulty": s.difficulty},
         }
         for s in load_scenarios()
     ]
@@ -34,15 +35,25 @@ def examples() -> list[dict]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--recreate", action="store_true")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--recreate", action="store_true", help="delete and rebuild the dataset")
+    group.add_argument("--append", action="store_true",
+                       help="add only scenarios that are not in the dataset yet (keeps experiment history)")
     args = parser.parse_args()
     get_settings()  # loads .env (LangSmith key) and the system certificate store
     from langsmith import Client
 
     client = Client()
     if client.has_dataset(dataset_name=DATASET_NAME):
+        if args.append:
+            present = {e.inputs["scenario_id"] for e in client.list_examples(dataset_name=DATASET_NAME)}
+            new = [e for e in examples() if e["inputs"]["scenario_id"] not in present]
+            if new:
+                client.create_examples(dataset_name=DATASET_NAME, examples=new)
+            print(f"Appended {len(new)} examples: {[e['inputs']['scenario_id'] for e in new]}")
+            return
         if not args.recreate:
-            raise SystemExit(f"Dataset '{DATASET_NAME}' already exists (use --recreate to replace it)")
+            raise SystemExit(f"Dataset '{DATASET_NAME}' already exists (use --append or --recreate)")
         client.delete_dataset(dataset_name=DATASET_NAME)
     dataset = client.create_dataset(DATASET_NAME, description=(
         "Bug investigation scenarios in Python, C#, JavaScript/TypeScript, Go and Java. "

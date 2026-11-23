@@ -106,6 +106,42 @@ class ReviewDecision(BaseModel):
     next_step: Literal["revise_fix", "reinvestigate"] = "revise_fix"
 
 
+class ClarificationAnswer(BaseModel):
+    """The human's answer when the agent asks why a fix was rejected."""
+
+    answer: str = Field(min_length=1)
+    next_step: Literal["revise_fix", "reinvestigate"] | None = None
+
+
+class FixReviewRequest(BaseModel):
+    """What the graph shows a human when it pauses for approval of a fix."""
+
+    type: Literal["fix_review"] = "fix_review"
+    attempt: int
+    max_attempts: int
+    root_cause: str
+    explanation: str
+    diff: str
+    evidence_ids: list[str]
+    verified_by_tests: bool
+
+
+class ClarificationRequest(BaseModel):
+    """What the graph asks when a fix was rejected without a reason."""
+
+    type: Literal["clarification"] = "clarification"
+    question: str
+
+
+PauseRequest = Annotated[FixReviewRequest | ClarificationRequest, Field(discriminator="type")]
+
+# Every kind of pause the graph can make, and the shape of the answer it expects to resume.
+RESUME_SCHEMAS: dict[str, type[BaseModel]] = {
+    "fix_review": ReviewDecision,
+    "clarification": ClarificationAnswer,
+}
+
+
 class TestRun(BaseModel):
     __test__ = False  # tell pytest this is not a test class
 

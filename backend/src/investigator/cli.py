@@ -1,10 +1,10 @@
-"""Run an investigation from the terminal.
+﻿"""Run an investigation from the terminal.
 
-    investigate --path ../evaluation/scenarios/py-off-by-one --bug "..." [--error-file err.txt]
+    investigate --path ../evaluation/scenarios/py-off-by-one/project --bug "..." [--error-file err.txt]
     investigate --github https://github.com/owner/repo --bug "..."
     investigate --zip project.zip --bug "..."
 
-When the graph pauses at human_review, the proposed diff is shown and you approve or reject it here.
+When the graph pauses (fix review, or a clarification question), you answer here in the terminal.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 from .config import get_settings
-from .graph.state import BugReport, ReviewDecision
+from .graph.state import BugReport, ClarificationAnswer, ReviewDecision
 from .sandbox.sources import GitHubSource, LocalSource, ProjectSource, ZipSource
 from .service import InvestigationService
 
@@ -37,10 +37,11 @@ def main(argv: list[str] | None = None) -> int:
             for node in update:
                 if node != "__interrupt__":
                     print(f"  ✓ {node}")
-        review = service.pending_review(thread_id)
-        if review is None:
+        pause = service.pending_interrupt(thread_id)
+        if pause is None:
             break
-        events = service.resume(thread_id, _ask_human(review))
+        answer = _ask_review(pause) if pause["type"] == "fix_review" else _ask_clarification(pause)
+        events = service.resume(thread_id, answer)
 
     report = service.snapshot(thread_id).values["report"]
     print("\n" + report.model_dump_json(indent=2))
@@ -56,7 +57,7 @@ def _source(args: argparse.Namespace) -> ProjectSource:
     return LocalSource(Path(args.path))
 
 
-def _ask_human(review: dict) -> ReviewDecision:
+def _ask_review(review: dict) -> ReviewDecision:
     print("\n" + "=" * 70)
     print(f"HUMAN REVIEW (attempt {review['attempt']}/{review['max_attempts']})")
     print(f"Root cause: {review['root_cause']}\nWhy this fix: {review['explanation']}")
@@ -66,10 +67,18 @@ def _ask_human(review: dict) -> ReviewDecision:
     print("-" * 70 + "\n" + (review["diff"] or "(empty diff)") + "-" * 70)
     if input("Approve this fix? [y/n] ").strip().lower().startswith("y"):
         return ReviewDecision(decision="approve")
-    feedback = input("What is wrong with it? ").strip()
+    feedback = input("What is wrong with it? (Enter to skip) ").strip()
     again = input("Revise the fix (f) or re-investigate (i)? [f/i] ").strip().lower()
     return ReviewDecision(decision="reject", feedback=feedback,
                           next_step="reinvestigate" if again.startswith("i") else "revise_fix")
+
+
+def _ask_clarification(pause: dict) -> ClarificationAnswer:
+    print(f"\nQUESTION FROM THE AGENT: {pause['question']}")
+    answer = ""
+    while not answer:
+        answer = input("> ").strip()
+    return ClarificationAnswer(answer=answer)
 
 
 def _parse(argv: list[str] | None) -> argparse.Namespace:

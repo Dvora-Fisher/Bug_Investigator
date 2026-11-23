@@ -17,7 +17,7 @@ from ...tools.project_tools import build_read_tools
 from ..context import Rt
 from ..render import bug_block, cited_evidence, evidence_block, hypotheses_block
 from ..state import (
-    FileEdit, Finding, InvestigationState, ProposedFix, ReviewDecision, TestRun, after_fix_runs, leading_hypothesis,
+    ClarificationAnswer, ClarificationRequest, FileEdit, Finding, FixReviewRequest, InvestigationState, ProposedFix, ReviewDecision, TestRun, after_fix_runs, leading_hypothesis,
 )
 
 
@@ -63,24 +63,35 @@ def propose_fix(state: InvestigationState, runtime: Rt) -> dict:
     return {"proposed_fix": fix, "evidence": recorder.items, "fix_attempts": state.get("fix_attempts", 0) + 1}
 
 
+CLARIFICATION_QUESTION = ("You rejected the fix without saying why. What is wrong with it? "
+                          "Should I revise the fix, or investigate a different cause?")
+
+
 def human_review(state: InvestigationState, runtime: Rt) -> dict:
     """Pause the graph until a human approves or rejects the proposed fix.
 
     interrupt() saves the state in the checkpointer and stops. The run continues only when someone
     calls the graph again with Command(resume={...}) on the same thread_id; that value is returned here.
+    A rejection without a reason triggers a second pause asking the human for clarification.
+    (On resume LangGraph re-runs this node from the top and replays earlier answers in order,
+    so the node must stay deterministic and side-effect free before each interrupt.)
     """
     fix = state["proposed_fix"]
-    answer = interrupt({
-        "type": "fix_review",
-        "attempt": state["fix_attempts"],
-        "max_attempts": state["options"].max_fix_attempts,
-        "root_cause": fix.root_cause,
-        "explanation": fix.explanation,
-        "diff": fix.diff,
-        "evidence_ids": fix.evidence_ids,
-        "verified_by_tests": state["profile"].capability >= Capability.VERIFY,
-    })
+    answer = interrupt(FixReviewRequest(
+        attempt=state["fix_attempts"],
+        max_attempts=state["options"].max_fix_attempts,
+        root_cause=fix.root_cause,
+        explanation=fix.explanation,
+        diff=fix.diff,
+        evidence_ids=fix.evidence_ids,
+        verified_by_tests=state["profile"].capability >= Capability.VERIFY,
+    ).model_dump())
     review = ReviewDecision.model_validate(answer)
+    if review.decision == "reject" and not review.feedback.strip():
+        clarification = ClarificationAnswer.model_validate(
+            interrupt(ClarificationRequest(question=CLARIFICATION_QUESTION).model_dump()))
+        review = review.model_copy(update={"feedback": clarification.answer,
+                                           "next_step": clarification.next_step or review.next_step})
     update: dict = {"review": review}
     leader = leading_hypothesis(state)
     if review.decision == "reject" and review.next_step == "reinvestigate" and leader:

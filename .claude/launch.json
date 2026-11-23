@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": "D:\\Users\\User\\Documents\\bug-investigator\\backend\\.venv\\Scripts\\python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "investigator.api.app:app", "--port", "8000"],
+      "port": 8000
+    }
+  ]
+}

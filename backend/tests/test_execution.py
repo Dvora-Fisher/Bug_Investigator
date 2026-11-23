@@ -42,7 +42,7 @@ def test_failed_fix_loops_back_to_propose(make_service, sample_project):
     service = make_service(happy_script(reproduce_bug=[reproduced_by_suite], propose_fix=[fix(), fix()]), runner)
     tid = run_until_pause(service, sample_project)
     list(service.resume(tid, ReviewDecision(decision="approve")))
-    review = service.pending_review(tid)
+    review = service.pending_interrupt(tid)
     assert review is not None and review["attempt"] == 2, "a failed fix must go back to propose_fix + review"
     list(service.resume(tid, ReviewDecision(decision="approve")))
     assert service.snapshot(tid).values["report"].outcome == "fixed_and_verified"
@@ -78,7 +78,7 @@ def test_install_failure_skips_reproduction_but_still_proposes(make_service, sam
     tid = run_until_pause(service, sample_project)
     repro = service.snapshot(tid).values["reproduction"]
     assert not repro.attempted and "dependencies failed" in repro.method
-    assert service.pending_review(tid) is not None
+    assert service.pending_interrupt(tid) is not None
 
 
 # ----------------------------------------------------------------------------- executor rules

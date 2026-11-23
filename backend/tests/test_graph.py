@@ -52,7 +52,7 @@ def test_full_run_pauses_for_review_and_finishes_after_approval(make_service, sa
     service = make_service(reasoner)
     tid = run_until_pause(service, sample_project)
 
-    review = service.pending_review(tid)
+    review = service.pending_interrupt(tid)
     assert review is not None, "graph must stop at human_review"
     assert "+    for start in range(len(values) - window + 1):" in review["diff"]
     ws_file = service.settings.workspaces_dir / tid / "project" / "stats" / "moving.py"
@@ -62,7 +62,7 @@ def test_full_run_pauses_for_review_and_finishes_after_approval(make_service, sa
     state = service.snapshot(tid).values
     report = state["report"]
 
-    assert service.pending_review(tid) is None
+    assert service.pending_interrupt(tid) is None
     assert "window + 1" in ws_file.read_text()
     assert report.outcome == "fixed_unverified"  # no sandbox yet, and the report must say so
     assert report.files == ["stats/moving.py"]
@@ -77,7 +77,7 @@ def test_rejected_fix_is_revised_with_feedback(make_service, sample_project):
     tid = run_until_pause(service, sample_project)
 
     list(service.resume(tid, ReviewDecision(decision="reject", feedback="index out of range", next_step="revise_fix")))
-    second = service.pending_review(tid)
+    second = service.pending_interrupt(tid)
     assert second["attempt"] == 2 and "window + 1" in second["diff"]
 
     list(service.resume(tid, ReviewDecision(decision="approve")))
@@ -96,7 +96,7 @@ def test_reviewer_can_send_the_agent_back_to_investigate(make_service, sample_pr
     state = service.snapshot(tid).values
     assert state["hypothesis_rounds"] == 2
     assert [(h.id, h.status) for h in state["hypotheses"]] == [("H1", "refuted"), ("H2", "supported")]
-    assert service.pending_review(tid) is not None
+    assert service.pending_interrupt(tid) is not None
 
 
 def test_baseline_mode_skips_the_challenge(make_service, sample_project):
@@ -118,7 +118,7 @@ def test_refuted_by_challenge_generates_new_hypotheses(make_service, sample_proj
     tid = run_until_pause(service, sample_project)
     state = service.snapshot(tid).values
     assert [h.status for h in state["hypotheses"]] == ["refuted", "supported"]
-    assert service.pending_review(tid) is not None
+    assert service.pending_interrupt(tid) is not None
 
 
 def test_citing_invented_evidence_stops_cleanly(make_service, sample_project):
@@ -148,7 +148,7 @@ def test_paused_investigation_survives_a_restart(settings, sample_project, caplo
 
     tid = run_until_pause(new_service(), sample_project)
     restarted = new_service()
-    assert restarted.pending_review(tid) is not None
+    assert restarted.pending_interrupt(tid) is not None
     list(restarted.resume(tid, ReviewDecision(decision="approve")))
     assert restarted.snapshot(tid).values["report"].outcome == "fixed_unverified"
     assert "unregistered type" not in caplog.text  # every State type is on the allowlist

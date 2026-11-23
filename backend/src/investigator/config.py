@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     # Windows. Verification stays fully on; only the source of trusted certificates changes.
     use_system_trust_store: bool = True
 
+    # --- Web API ---
+    cors_origins: list[str] = ["http://localhost:5173"]  # the Vite dev server of the frontend
+
     # --- Storage ---
     data_dir: Path = ROOT_DIR / "data"
 

@@ -1,0 +1,8 @@
+# Store and check out text files with LF line endings on every OS.
+# Sandbox containers are Linux, and fix proposals match file text exactly,
+# so Windows CRLF conversions would break both.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.zip binary

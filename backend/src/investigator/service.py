@@ -19,7 +19,9 @@ from .budget import UsageLedger
 from .config import InvestigationMode, Settings
 from .graph.builder import build_graph, initial_state
 from .graph.context import InvestigationContext
-from .graph.state import BugReport, ReviewDecision, checkpoint_serializer
+from pydantic import BaseModel
+
+from .graph.state import RESUME_SCHEMAS, BugReport, checkpoint_serializer
 from .llm import LLMReasoner, Reasoner
 from .sandbox.docker_runner import DockerRunner
 from .sandbox.executor import Runner
@@ -27,6 +29,10 @@ from .sandbox.sources import ProjectSource, create_workspace
 from .sandbox.workspace import Workspace
 
 ReasonerFactory = Callable[[str], Reasoner]  # thread_id -> reasoner
+
+
+class NotWaitingForHuman(RuntimeError):
+    """A resume was requested for an investigation that is not paused at an interrupt."""
 
 
 class InvestigationService:
@@ -53,15 +59,24 @@ class InvestigationService:
     def start(self, thread_id: str, bug: BugReport, mode: InvestigationMode | None = None) -> Iterator[dict[str, Any]]:
         return self._stream(thread_id, initial_state(bug, self.settings, mode))
 
-    def resume(self, thread_id: str, decision: ReviewDecision) -> Iterator[dict[str, Any]]:
-        return self._stream(thread_id, Command(resume=decision.model_dump()))
+    def validate_resume(self, thread_id: str, answer: dict | BaseModel) -> BaseModel:
+        """Check an answer against the pause the graph is actually waiting on (before resuming anything)."""
+        pending = self.pending_interrupt(thread_id)
+        if pending is None:
+            raise NotWaitingForHuman(f"Investigation {thread_id} is not waiting for a human")
+        data = answer.model_dump() if isinstance(answer, BaseModel) else answer
+        return RESUME_SCHEMAS[pending["type"]].model_validate(data)  # raises ValidationError on a mismatch
+
+    def resume(self, thread_id: str, answer: dict | BaseModel) -> Iterator[dict[str, Any]]:
+        value = self.validate_resume(thread_id, answer)
+        return self._stream(thread_id, Command(resume=value.model_dump()))
 
     # ------------------------------------------------------------------ queries
 
     def snapshot(self, thread_id: str) -> StateSnapshot:
         return self.graph.get_state(self._config(thread_id))
 
-    def pending_review(self, thread_id: str) -> dict | None:
+    def pending_interrupt(self, thread_id: str) -> dict | None:
         """The interrupt payload if this investigation is waiting for a human, else None."""
         interrupts = [i for task in self.snapshot(thread_id).tasks for i in task.interrupts]
         return interrupts[0].value if interrupts else None

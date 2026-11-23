@@ -9,6 +9,7 @@ SKIP_DIRS = frozenset({
     ".git", ".hg", ".svn", ".vs", ".idea", ".vscode",
     "node_modules", ".venv", "venv", "env", "__pycache__", ".pytest_cache", ".mypy_cache", ".tox",
     "bin", "obj", "dist", "build", "target", "out", ".next", "coverage", ".gradle",
+    ".investigator",  # our own folder inside a workspace: dependencies, caches, reproduction files
 })
 
 # Files that may hold credentials. They are never copied, so the LLM can never read them.

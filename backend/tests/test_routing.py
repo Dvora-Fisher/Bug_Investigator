@@ -3,7 +3,9 @@
 import pytest
 
 from investigator.graph import routing as r
-from investigator.graph.state import Hypothesis, Location, Reproduction, ReviewDecision, RunOptions, TestRun
+from investigator.graph.state import (
+    Hypothesis, Location, Reproduction, ReviewDecision, RunOptions, TestRun, latest_verification,
+)
 
 
 def state(mode="improved", **extra):
@@ -52,6 +54,26 @@ def test_after_review(decision, next_step, attempts, expected):
     s = state(review=ReviewDecision(decision=decision, next_step=next_step), fix_attempts=attempts,
               hypothesis_rounds=1)
     assert r.after_review(s) == expected
+
+
+def run(phase, kind, passed, attempt=1):
+    return TestRun(command=kind, passed=passed, exit_code=0 if passed else 1, output_excerpt="",
+                   phase=phase, kind=kind, attempt=attempt)
+
+
+@pytest.mark.parametrize("runs,verified", [
+    # repro passes; suite was already broken before the fix -> verified (no pointless retries)
+    ([run("before_fix", "suite", False, 0), run("after_fix", "suite", False), run("after_fix", "repro", True)], True),
+    # repro passes but a suite that passed before now fails -> regression -> not verified
+    ([run("before_fix", "suite", True, 0), run("after_fix", "suite", False), run("after_fix", "repro", True)], False),
+    # no repro script: the suite decides
+    ([run("before_fix", "suite", False, 0), run("after_fix", "suite", True)], True),
+    ([run("before_fix", "suite", False, 0), run("after_fix", "suite", False)], False),
+    # only the latest attempt counts
+    ([run("after_fix", "suite", False, 1), run("after_fix", "suite", True, 2)], True),
+])
+def test_verification_rule(runs, verified):
+    assert latest_verification({"test_runs": runs}) is verified
 
 
 def test_failed_tests_retry_fix_at_most_three_times():

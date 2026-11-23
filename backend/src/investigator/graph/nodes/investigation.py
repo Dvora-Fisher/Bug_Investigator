@@ -7,10 +7,13 @@ from pydantic import BaseModel, Field
 from ...prompts import system_prompt
 from ...runtimes.base import Capability
 from ...tools.evidence import EvidenceRecorder, truncate
+from ...tools.execution_tools import EXECUTION_TOOLS, build_execution_tools
 from ...tools.project_tools import build_read_tools
 from ..context import Rt
 from ..render import bug_block, cited_evidence, evidence_block, hypotheses_block
-from ..state import Finding, Hypothesis, InvestigationState, Location, Reproduction, leading_hypothesis
+from ..state import (
+    Finding, Hypothesis, InvestigationState, Location, Reproduction, TestRun, leading_hypothesis,
+)
 
 REFERENCED_FILE_CHARS = 2500
 
@@ -38,6 +41,16 @@ class EvidenceFindings(BaseModel):
 class ChallengeVerdict(BaseModel):
     holds: bool
     reason: str
+
+
+class ReproductionReport(BaseModel):
+    """Submit whether the bug was reproduced, how, and the evidence ids of the runs that show it."""
+
+    reproduced: bool
+    method: str = Field(description="How the bug shows up (which test / script, what output)")
+    evidence_ids: list[str]
+    command: list[str] = Field(default_factory=list, description="The reproduction command you ran, if you "
+                               "wrote a script; leave empty if the existing test suite shows the bug")
 
 
 # ----------------------------------------------------------------------------- nodes
@@ -128,14 +141,50 @@ def challenge_hypothesis(state: InvestigationState, runtime: Rt) -> dict:
 
 
 def reproduce_bug(state: InvestigationState, runtime: Rt) -> dict:
+    """Run the existing tests first (no LLM). The LLM then judges the output and, if the suite does not
+    show the bug, may write and run a small reproduction script. It must cite execution evidence."""
+    ctx = runtime.context
     profile = state["profile"]
     if profile.capability < Capability.RUN:
-        reason = ("no runtime adapter for this project" if profile.runtime is None
-                  else "the execution sandbox is not enabled")
-        return {"reproduction": Reproduction(attempted=False, reproduced=False,
-                                             method=f"Not attempted: {reason}.")}
-    # Running tests in the Docker sandbox is implemented in stage C.
-    raise NotImplementedError("Sandbox execution arrives in stage C")
+        reason = ("no runtime adapter for this language" if profile.runtime is None
+                  else "the Docker sandbox is not available")
+        return {"reproduction": Reproduction(attempted=False, reproduced=False, method=f"Not attempted: {reason}.")}
+
+    executor = ctx.executor(profile.runtime)
+    recorder = EvidenceRecorder(len(state.get("evidence", [])), ctx.settings.max_tool_output_chars)
+    install = executor.install()
+    if not install.ok:
+        recorder.observe("install_dependencies", {}, install.render())
+        return {"evidence": recorder.items, "reproduction": Reproduction(
+            attempted=False, reproduced=False, evidence_ids=[recorder.items[-1].id],
+            method="Not attempted: installing the project's dependencies failed (see evidence).")}
+
+    baseline = executor.run_tests()
+    baseline_text = recorder.observe("initial_test_run", {}, baseline.render())
+    before = TestRun.from_exec(baseline, recorder.items[-1], phase="before_fix")
+
+    def validate(r: ReproductionReport) -> str | None:
+        execution_ids = {e.id for e in recorder.items if e.tool in EXECUTION_TOOLS}
+        if r.reproduced and not set(r.evidence_ids) & execution_ids:
+            return f"A reproduction must cite the output of a run. Execution evidence ids: {sorted(execution_ids)}"
+        if bad := [i for i in r.evidence_ids if i not in {e.id for e in [*state.get('evidence', []), *recorder.items]}]:
+            return f"Evidence ids {bad} do not exist."
+        return None
+
+    leader = leading_hypothesis(state)
+    user = "\n\n".join(filter(None, [
+        bug_block(state),
+        f"## Leading hypothesis\n{hypotheses_block([leader])}" if leader else "",
+        f"## Result of running the existing test suite\n{baseline_text}",
+    ]))
+    tools = [*build_read_tools(ctx.workspace, recorder), *build_execution_tools(executor, recorder)]
+    report = ctx.reasoner.tool_loop("reproduce_bug", system_prompt("reproduce", state["options"].mode), user,
+                                    tools, ReproductionReport, ctx.settings.max_repro_tool_steps, validate)
+    return {
+        "reproduction": Reproduction(attempted=True, **report.model_dump()),
+        "evidence": recorder.items,
+        "test_runs": [before],
+    }
 
 
 # ----------------------------------------------------------------------------- helpers

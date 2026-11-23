@@ -82,3 +82,19 @@ def test_gives_up_after_max_steps(settings, tmp_path):
     with pytest.raises(ReasoningFailed):
         r.tool_loop("step", "sys", "user", [double], Answer, max_steps=2)
     assert "Tool budget used up" in model.seen[-1][-1].content  # the last turn asks for a submission
+
+
+def test_history_is_append_only(settings, tmp_path):
+    """Every request must start with the exact previous request (thinking blocks are bound to it)."""
+    replies = [call("double", {"x": 1}, 1), call("double", {"x": 2}, 2), call("Answer", {"value": 4}, 3)]
+    r, model, _ = reasoner(settings, tmp_path, replies)
+    assert r.tool_loop("step", "sys", "user", [double], Answer, max_steps=2).value == 4
+    for earlier, later in zip(model.seen, model.seen[1:]):
+        assert later[:len(earlier)] == earlier
+
+
+def test_tools_are_not_run_after_the_budget(settings, tmp_path):
+    r, model, _ = reasoner(settings, tmp_path, [call("double", {"x": 1}, 1), call("double", {"x": 2}, 2)])
+    with pytest.raises(ReasoningFailed):
+        r.tool_loop("step", "sys", "user", [double], Answer, max_steps=1)
+    assert len(model.seen) == 2

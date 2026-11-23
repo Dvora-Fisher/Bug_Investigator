@@ -51,8 +51,14 @@ class Settings(BaseSettings):
     max_files: int = 5000
     git_clone_timeout_s: int = 120
 
-    # --- Execution sandbox (enabled in stage C) ---
-    execution_enabled: bool = False
+    # --- Execution sandbox (Docker) ---
+    execution_enabled: bool = True  # master switch; when off, nothing is ever executed
+    sandbox_memory: str = "2g"
+    sandbox_cpus: float = 2.0
+    sandbox_pids: int = 512
+    sandbox_run_timeout_s: int = 180
+    sandbox_install_timeout_s: int = 600
+    max_repro_tool_steps: int = 4
 
     # --- Network ---
     # Verify HTTPS certificates with the operating system's certificate store instead of Python's

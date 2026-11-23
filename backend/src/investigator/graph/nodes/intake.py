@@ -47,7 +47,7 @@ def inspect_project(state: InvestigationState, runtime: Rt) -> dict:
         extensions=ws.extension_counts(),
         manifests=[f for f in files if any(fnmatch(f.rsplit("/", 1)[-1], p) for p in MANIFEST_PATTERNS)][:20],
         runtime=adapter.name if adapter else None,
-        capability=capability_for(adapter, runtime.context.settings),
+        capability=capability_for(adapter, bool(adapter) and runtime.context.sandbox_ready(adapter.image)),
     )}
 
 

@@ -9,7 +9,9 @@ from __future__ import annotations
 
 from ...runtimes.base import Capability
 from ..context import Rt
-from ..state import Claim, FinalReport, InvestigationState, leading_hypothesis
+from ..state import (
+    Claim, FinalReport, InvestigationState, latest_verification, leading_hypothesis, suite_failed_for_other_reasons,
+)
 
 
 def final_report(state: InvestigationState, runtime: Rt) -> dict:
@@ -28,6 +30,9 @@ def final_report(state: InvestigationState, runtime: Rt) -> dict:
              for f in findings if f.verdict == "supported" and f.evidence_ids and f.hypothesis_id in by_id]
     if repro and repro.reproduced:
         facts.append(Claim(text=f"Bug reproduced: {repro.method}", evidence_ids=repro.evidence_ids))
+    facts += [Claim(text=f"{'Before the fix' if t.phase == 'before_fix' else f'After fix attempt {t.attempt}'}: "
+                         f"`{t.command}` {'passed' if t.passed else f'failed (exit code {t.exit_code})'}",
+                    evidence_ids=[t.evidence_id]) for t in tests if t.evidence_id]
     backed = {f.hypothesis_id for f in findings if f.verdict == "supported" and f.evidence_ids}
     unverified = [f"{h.id}: {h.statement}" for h in hypotheses if h.status != "refuted" and h.id not in backed]
 
@@ -35,6 +40,11 @@ def final_report(state: InvestigationState, runtime: Rt) -> dict:
     if profile and profile.capability < Capability.VERIFY:
         notes.append("Tests could not be run for this project, so the fix is NOT verified "
                      f"(runtime: {profile.runtime or 'none detected'}).")
+    if repro and repro.attempted and not repro.reproduced:
+        notes.append("The bug could not be reproduced; the diagnosis rests on code reading only.")
+    if suite_failed_for_other_reasons(state):
+        notes.append("The project's test suite was already failing before the fix for reasons other than this bug, "
+                     "so it could not confirm the fix; verification relied on the reproduction command.")
     if halt := state.get("halt_reason"):
         notes.append(f"Investigation stopped early: {halt}")
     if fix and not applied:
@@ -60,7 +70,7 @@ def _outcome(state: InvestigationState, applied: bool) -> str:
         return "stopped"
     if not applied:
         return "no_fix"
-    tests = state.get("test_runs", [])
-    if not tests:
+    verified = latest_verification(state)
+    if verified is None:
         return "fixed_unverified"
-    return "fixed_and_verified" if tests[-1].passed else "fix_failed"
+    return "fixed_and_verified" if verified else "fix_failed"

@@ -16,7 +16,9 @@ from ...tools.evidence import EvidenceRecorder
 from ...tools.project_tools import build_read_tools
 from ..context import Rt
 from ..render import bug_block, cited_evidence, evidence_block, hypotheses_block
-from ..state import FileEdit, Finding, InvestigationState, ProposedFix, ReviewDecision, leading_hypothesis
+from ..state import (
+    FileEdit, Finding, InvestigationState, ProposedFix, ReviewDecision, TestRun, after_fix_runs, leading_hypothesis,
+)
 
 
 class FixProposal(BaseModel):
@@ -100,9 +102,26 @@ def apply_fix(state: InvestigationState, runtime: Rt) -> dict:
 
 
 def run_tests(state: InvestigationState, runtime: Rt) -> dict:
+    """Re-run the test suite (and the reproduction command, if one was written) after the fix.
+    No LLM: pass/fail comes from exit codes, not from the model's opinion."""
     if state["profile"].capability < Capability.VERIFY:
         return {}  # nothing can be verified; the report says so explicitly
-    raise NotImplementedError("Sandbox execution arrives in stage C")
+    ctx = runtime.context
+    executor = ctx.executor(state["profile"].runtime)
+    recorder = EvidenceRecorder(len(state.get("evidence", [])), ctx.settings.max_tool_output_chars)
+    runs = []
+    for tool, kind, result in _verification_runs(executor, state):
+        recorder.observe(tool, {"attempt": state["fix_attempts"]}, result.render())
+        runs.append(TestRun.from_exec(result, recorder.items[-1], phase="after_fix", kind=kind,
+                                      attempt=state["fix_attempts"]))
+    return {"test_runs": runs, "evidence": recorder.items}
+
+
+def _verification_runs(executor, state: InvestigationState):
+    yield "run_tests", "suite", executor.run_tests()
+    repro = state.get("reproduction")
+    if repro and repro.reproduced and repro.command:
+        yield "run_command", "repro", executor.run_command(repro.command)
 
 
 def _history_block(state: InvestigationState) -> str:
@@ -111,7 +130,7 @@ def _history_block(state: InvestigationState) -> str:
     review = state.get("review")
     if review and review.decision == "reject" and review.feedback:
         lines.append(f"- Reviewer rejected the previous fix: {review.feedback}")
-    for run in state.get("test_runs", []):
+    for run in after_fix_runs(state):
         if not run.passed:
             lines.append(f"- Tests failed after a previous fix (`{run.command}`):\n{run.output_excerpt}")
     return "## Previous attempts\n" + "\n".join(lines) if lines else ""

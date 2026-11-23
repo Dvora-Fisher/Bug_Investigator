@@ -21,6 +21,8 @@ from .graph.builder import build_graph, initial_state
 from .graph.context import InvestigationContext
 from .graph.state import BugReport, ReviewDecision, checkpoint_serializer
 from .llm import LLMReasoner, Reasoner
+from .sandbox.docker_runner import DockerRunner
+from .sandbox.executor import Runner
 from .sandbox.sources import ProjectSource, create_workspace
 from .sandbox.workspace import Workspace
 
@@ -29,8 +31,10 @@ ReasonerFactory = Callable[[str], Reasoner]  # thread_id -> reasoner
 
 class InvestigationService:
     def __init__(self, settings: Settings, checkpointer: BaseCheckpointSaver | None = None,
-                 reasoner_factory: ReasonerFactory | None = None):
+                 reasoner_factory: ReasonerFactory | None = None, runner: Runner | None | bool = True):
+        """runner=True builds the real Docker runner; pass None to disable execution, or a fake for tests."""
         self.settings = settings
+        self.runner = DockerRunner(settings) if runner is True else runner or None
         self.ledger = UsageLedger(settings.usage_db, settings)
         if checkpointer is None:
             checkpointer = SqliteSaver(sqlite3.connect(settings.checkpoint_db, check_same_thread=False),
@@ -77,5 +81,6 @@ class InvestigationService:
             workspace=Workspace.open(self.settings.workspaces_dir, thread_id),
             reasoner=self._reasoner_factory(thread_id),
             settings=self.settings,
+            runner=self.runner,
         )
         yield from self.graph.stream(payload, self._config(thread_id), context=context, stream_mode="updates")

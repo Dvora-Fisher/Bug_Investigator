@@ -81,6 +81,8 @@ class Reproduction(BaseModel):
     reproduced: bool
     method: str
     evidence_ids: list[str] = Field(default_factory=list)
+    command: list[str] = Field(default_factory=list, description="Extra command that demonstrates the bug, "
+                               "re-run after the fix; empty when the test suite itself shows the bug")
 
 
 class FileEdit(BaseModel):
@@ -111,6 +113,17 @@ class TestRun(BaseModel):
     passed: bool
     exit_code: int | None
     output_excerpt: str
+    phase: Literal["before_fix", "after_fix"] = "after_fix"
+    kind: Literal["suite", "repro"] = "suite"  # the project's test suite, or our reproduction command
+    attempt: int = 0  # fix attempt this run verified (0 = before any fix)
+    evidence_id: str = ""
+
+    @classmethod
+    def from_exec(cls, result, evidence: Evidence, phase: Literal["before_fix", "after_fix"],
+                  kind: Literal["suite", "repro"] = "suite", attempt: int = 0) -> TestRun:
+        """Build from a sandbox ExecResult and the evidence item that recorded its output."""
+        return cls(command=result.command, passed=result.ok, exit_code=result.exit_code, kind=kind,
+                   output_excerpt=evidence.excerpt, phase=phase, attempt=attempt, evidence_id=evidence.id)
 
 
 class Claim(BaseModel):
@@ -172,6 +185,36 @@ def checkpoint_serializer() -> JsonPlusSerializer:
 
 def evidence_by_id(state: InvestigationState) -> dict[str, Evidence]:
     return {e.id: e for e in state.get("evidence", [])}
+
+
+def after_fix_runs(state: InvestigationState) -> list[TestRun]:
+    return [t for t in state.get("test_runs", []) if t.phase == "after_fix"]
+
+
+def suite_failed_for_other_reasons(state: InvestigationState) -> bool:
+    """The suite failed before the fix, but that failure is NOT how the bug was reproduced
+    (the bug needed its own reproduction command, or was not reproduced at all)."""
+    repro = state.get("reproduction")
+    suite_failed = any(t.phase == "before_fix" and t.kind == "suite" and not t.passed
+                       for t in state.get("test_runs", []))
+    return suite_failed and not (repro and repro.reproduced and not repro.command)
+
+
+def latest_verification(state: InvestigationState) -> bool | None:
+    """Did the most recent fix attempt work? None if nothing was run after a fix.
+
+    It worked when (1) the bug-specific check passes: our reproduction command if there is one,
+    otherwise the test suite; and (2) nothing new broke: a suite that passed before the fix must
+    still pass. A suite that was already failing before the fix does not block verification
+    (no fix can repair unrelated failures, so retrying would only waste attempts).
+    """
+    runs = after_fix_runs(state)
+    if not runs:
+        return None
+    latest = [r for r in runs if r.attempt == max(r.attempt for r in runs)]
+    target = [r for r in latest if r.kind == "repro"] or [r for r in latest if r.kind == "suite"]
+    regression = not suite_failed_for_other_reasons(state) and any(r.kind == "suite" and not r.passed for r in latest)
+    return all(r.passed for r in target) and not regression
 
 
 def leading_hypothesis(state: InvestigationState) -> Hypothesis | None:

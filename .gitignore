@@ -4,6 +4,9 @@
 # Runtime data: workspaces, checkpoints, uploads, usage ledger
 data/
 
+# Host certificates exported for the sandbox images (machine-specific)
+sandbox-images/certs/*.crt
+
 # Python
 .venv/
 __pycache__/

@@ -19,6 +19,7 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     "python-multipart>=0.0.9",
     "truststore>=0.10",
+    "pyyaml>=6",
 ]
 
 [project.optional-dependencies]
@@ -36,3 +37,4 @@ investigator = ["prompts/*.md"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = ["docker: needs Docker and the sandbox images (python -m investigator.sandbox.images)"]

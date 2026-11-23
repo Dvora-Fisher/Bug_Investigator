@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from functools import wraps
 
-from .state import InvestigationState, leading_hypothesis
+from .state import InvestigationState, latest_verification, leading_hypothesis
 
 Router = Callable[[InvestigationState], str]
 REPORT = "final_report"
@@ -82,8 +82,7 @@ def after_apply(state: InvestigationState) -> str:
 
 @_halts_to_report
 def after_tests(state: InvestigationState) -> str:
-    runs = state.get("test_runs", [])
-    if runs and not runs[-1].passed and _fix_attempts_left(state):
+    if latest_verification(state) is False and _fix_attempts_left(state):
         return "propose_fix"  # the fix did not work: try again (bounded by max_fix_attempts)
     return REPORT
 

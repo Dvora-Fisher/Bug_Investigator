@@ -79,17 +79,19 @@ class LLMReasoner:
         return out["parsed"]
 
     def tool_loop(self, step, system, user, tools, submit_schema, max_steps, validate=None):
+        """Up to max_steps rounds of tool use, then one last round in which only a submission counts.
+
+        The conversation is append-only and the tool list never changes during a loop: current models
+        bind their reasoning to the exact earlier context, so editing it would invalidate that reasoning.
+        """
         submit_name = submit_schema.__name__
-        with_tools = self._model.bind_tools([*tools, submit_schema])
-        submit_only = self._model.bind_tools([submit_schema])
+        model = self._model.bind_tools([*tools, submit_schema])
         by_name = {t.name: t for t in tools}
         messages: list[BaseMessage] = [SystemMessage(system), HumanMessage(user)]
 
         for i in range(max_steps + 1):
-            final_turn = i == max_steps
-            if final_turn:
-                messages.append(HumanMessage(f"Tool budget used up. Call {submit_name} now with your best answer."))
-            ai: AIMessage = self._invoke(submit_only if final_turn else with_tools, messages, step)
+            budget_left = i < max_steps
+            ai: AIMessage = self._invoke(model, messages, step)
             messages.append(ai)
 
             if not ai.tool_calls:
@@ -102,12 +104,18 @@ class LLMReasoner:
                     result, error = self._validate(submit_schema, call["args"], validate)
                     if result is not None:
                         return result
-                    replies.append(ToolMessage(f"Rejected: {error}", tool_call_id=call["id"], status="error"))
+                    log.warning("%s: submission rejected: %s", step, error)
+                    reply = f"Rejected: {error}"
+                elif not budget_left:
+                    reply = "Not run: the tool budget is used up."
                 elif (tool := by_name.get(call["name"])) is None:
-                    replies.append(ToolMessage(f"Unknown tool {call['name']}", tool_call_id=call["id"], status="error"))
+                    reply = f"Unknown tool {call['name']}"
                 else:
-                    replies.append(ToolMessage(self._run_tool(tool, call["args"]), tool_call_id=call["id"]))
+                    reply = self._run_tool(tool, call["args"])
+                replies.append(ToolMessage(reply, tool_call_id=call["id"]))
             messages.extend(replies)
+            if i == max_steps - 1:
+                messages.append(HumanMessage(f"Tool budget used up. Call {submit_name} now with your best answer."))
 
         raise ReasoningFailed(f"{step}: no valid {submit_name} after {max_steps} tool steps")
 

@@ -1,0 +1,12 @@
+id: cs-logic-error
+language: C#
+category: logic-error
+bug:
+  description: >
+    Customers whose cart total is exactly 100 are charged 100 instead of 90.
+    Our policy says orders of 100 or more get 10% off.
+  error_output: ""
+expected:
+  file: src/Billing/InvoiceCalculator.cs
+  symbol: Total
+  root_cause: The discount condition uses "subtotal > DiscountThreshold"; the policy is "100 or more", so it must be ">=".

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shutil
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from pydantic import BaseModel
 from investigator.config import Settings
 from investigator.graph.state import checkpoint_serializer
 from investigator.llm import ReasoningFailed
+from investigator.sandbox.docker_runner import ExecResult
 from investigator.service import InvestigationService
 
 SCENARIOS = Path(__file__).resolve().parents[2] / "evaluation" / "scenarios"
@@ -60,10 +62,33 @@ def sample_project(tmp_path: Path) -> Path:
     return dest
 
 
+class FakeRunner:
+    """Stands in for Docker: returns scripted results per command prefix and records every call."""
+
+    def __init__(self, results: dict[str, list[ExecResult]] | None = None):
+        self.results = {k: list(v) for k, v in (results or {}).items()}
+        self.calls: list[tuple[str, bool]] = []  # (command, network)
+
+    def image_exists(self, image: str) -> bool:
+        return True
+
+    def run(self, image, argv, workdir, *, network, timeout_s, env=None) -> ExecResult:
+        command = " ".join(argv)
+        self.calls.append((command, network))
+        for prefix, queue in self.results.items():
+            if command.startswith(prefix) and queue:
+                return replace(queue.pop(0), command=command)
+        return ExecResult(command, 0, "ok", False, 0.1)
+
+
+def exec_result(code: int, output: str = "") -> ExecResult:
+    return ExecResult("cmd", code, output, False, 0.1)
+
+
 @pytest.fixture
 def make_service(settings: Settings):
-    def factory(reasoner: FakeReasoner) -> InvestigationService:
+    def factory(reasoner: FakeReasoner, runner: FakeRunner | None = None) -> InvestigationService:
         settings.data_dir.mkdir(parents=True, exist_ok=True)
         return InvestigationService(settings, checkpointer=InMemorySaver(serde=checkpoint_serializer()),
-                                    reasoner_factory=lambda _: reasoner)
+                                    reasoner_factory=lambda _: reasoner, runner=runner)
     return factory

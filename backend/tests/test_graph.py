@@ -144,7 +144,7 @@ def test_paused_investigation_survives_a_restart(settings, sample_project, caplo
     settings.data_dir.mkdir(parents=True, exist_ok=True)
 
     def new_service():  # default checkpointer: SQLite file + our type allowlist
-        return InvestigationService(settings, reasoner_factory=lambda _: happy_script())
+        return InvestigationService(settings, reasoner_factory=lambda _: happy_script(), runner=None)
 
     tid = run_until_pause(new_service(), sample_project)
     restarted = new_service()

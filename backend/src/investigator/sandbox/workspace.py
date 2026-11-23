@@ -68,11 +68,17 @@ class Workspace:
         return data.decode("utf-8", errors="replace")
 
     def iter_files(self, base: Path | None = None) -> Iterator[str]:
-        """All project files as sorted posix paths relative to the project root."""
+        """Project source files as sorted posix paths. Generated folders (dependencies, build output,
+        our .investigator folder) are skipped, so tools only ever show the project's own code."""
         base = base or self.project
-        for path in sorted(base.rglob("*")):
+        for path in sorted(_walk(base)):
             if path.is_file():
                 yield path.relative_to(base).as_posix()
+
+    @property
+    def private_dir(self) -> Path:
+        """Our folder inside the project copy (mounted into the sandbox as /workspace/.investigator)."""
+        return self.project / ".investigator"
 
     def extension_counts(self) -> dict[str, int]:
         return dict(Counter(Path(f).suffix.lower() or Path(f).name for f in self.iter_files()).most_common(15))
@@ -80,7 +86,7 @@ class Workspace:
     def tree(self, sub_path: str = "", max_depth: int = 3, max_entries: int = 200) -> str:
         start = self.resolve(sub_path) if sub_path else self.project
         lines: list[str] = []
-        for path in sorted(start.rglob("*")):
+        for path in sorted(_walk(start)):
             rel = path.relative_to(start)
             if len(rel.parts) > max_depth:
                 continue
@@ -137,6 +143,15 @@ class Workspace:
 # ---------------------------------------------------------------------- helpers
 
 
+def _walk(base: Path) -> Iterator[Path]:
+    """Every file and folder under base, without descending into SKIP_DIRS or symlinked folders."""
+    for dirpath, dirnames, filenames in os.walk(base, followlinks=False):
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        current = Path(dirpath)
+        yield from (current / d for d in dirnames)
+        yield from (current / f for f in filenames)
+
+
 def _read_or_none(path: Path) -> bytes | None:
     return path.read_bytes() if path.exists() else None
 
@@ -149,23 +164,19 @@ def _unified(path: str, old: str, new: str) -> str:
 def copy_filtered(src: Path, dest: Path, *, max_files: int, max_bytes: int) -> None:
     """Copy a project, skipping generated folders, sensitive files, symlinks and oversized files."""
     total_files = total_bytes = 0
-    for dirpath, dirnames, filenames in os.walk(src, followlinks=False):
-        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not os.path.islink(os.path.join(dirpath, d))]
-        rel_dir = Path(dirpath).relative_to(src)
-        for name in filenames:
-            source = Path(dirpath) / name
-            if source.is_symlink() or is_sensitive(name):
-                continue
-            size = source.stat().st_size
-            if size > MAX_FILE_BYTES:
-                continue
-            total_files += 1
-            total_bytes += size
-            if total_files > max_files or total_bytes > max_bytes:
-                shutil.rmtree(dest, ignore_errors=True)
-                raise WorkspaceError(f"Project is too large (limit: {max_files} files / {max_bytes // 2**20} MB)")
-            target = dest / rel_dir / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, target)
+    for source in _walk(src):
+        if source.is_symlink() or not source.is_file() or is_sensitive(source.name):
+            continue
+        size = source.stat().st_size
+        if size > MAX_FILE_BYTES:
+            continue
+        total_files += 1
+        total_bytes += size
+        if total_files > max_files or total_bytes > max_bytes:
+            shutil.rmtree(dest, ignore_errors=True)
+            raise WorkspaceError(f"Project is too large (limit: {max_files} files / {max_bytes // 2**20} MB)")
+        target = dest / source.relative_to(src)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
     if total_files == 0:
         raise WorkspaceError("The project contains no readable files")

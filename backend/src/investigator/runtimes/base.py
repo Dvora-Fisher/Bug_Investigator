@@ -1,14 +1,17 @@
 """What a runtime adapter is, and how much the system can do for a given project.
 
-Adapters describe only *how to run* a project (image, install/test/build commands).
+Adapters describe only *how to run* a project (image, install/test commands, environment).
 They never analyse code: understanding code is the LLM's job, for any language.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import IntEnum
 from pathlib import Path
+
+SANDBOX_TAG = "1"  # bump when sandbox-images/Dockerfile changes, to force a rebuild
 
 
 class Capability(IntEnum):
@@ -31,11 +34,20 @@ class RuntimeAdapter:
     name: str
     languages: tuple[str, ...]
     markers: tuple[str, ...]  # glob patterns; any match means "this adapter applies"
-    image: str
-    install_cmd: tuple[str, ...]
-    test_cmd: tuple[str, ...]
-    build_cmd: tuple[str, ...] | None = None
+    base_image: str
+    install_cmd: tuple[str, ...]  # fixed command, runs WITH network (downloads dependencies)
+    test_cmd: tuple[str, ...]  # runs WITHOUT network
+    test_filter_args: tuple[str, ...] = ()  # e.g. ("-k",): how to run a subset of tests
+    image_setup: str = "true"  # extra shell step while building the image
+    env: Mapping[str, str] = field(default_factory=dict)
     allowed_executables: frozenset[str] = field(default_factory=frozenset)
+
+    @property
+    def image(self) -> str:
+        return f"bug-investigator/{self.name}:{SANDBOX_TAG}"
 
     def matches(self, root: Path) -> bool:
         return any(next(root.rglob(pattern), None) is not None for pattern in self.markers)
+
+    def test_command(self, test_filter: str = "") -> tuple[str, ...]:
+        return (*self.test_cmd, *self.test_filter_args, test_filter) if test_filter else self.test_cmd

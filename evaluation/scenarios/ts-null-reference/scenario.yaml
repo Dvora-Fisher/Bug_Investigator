@@ -1,0 +1,16 @@
+id: ts-null-reference
+language: TypeScript
+category: null-reference
+bug:
+  description: >
+    The user list page crashes for users who never opened their profile settings.
+    It should show the part of their email before "@" instead.
+  error_output: |
+    TypeError: Cannot read properties of undefined (reading 'nickname')
+        at displayName (file:///app/src/users.ts:13:33)
+        at Array.map (<anonymous>)
+        at listNames (file:///app/src/users.ts:21:16)
+expected:
+  file: src/users.ts
+  symbol: displayName
+  root_cause: displayName dereferences user.profile with a non-null assertion, but profile is optional; it must use optional chaining (user.profile?.nickname).

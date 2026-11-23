@@ -7,7 +7,7 @@ in memory); nothing is written to disk until a human approves and apply_fix runs
 from __future__ import annotations
 
 from langgraph.types import interrupt
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ...prompts import system_prompt
 from ...runtimes.base import Capability
@@ -22,12 +22,14 @@ from ..state import (
 
 
 class FixProposal(BaseModel):
-    """Submit the fix: root cause, explanation, exact edits and the evidence ids it relies on."""
+    """Submit the fix: the exact edits first, then the evidence ids, root cause and explanation."""
 
+    # Field order matters: in the experiments the model often submitted an empty edits list after
+    # writing long explanations. Asking for the edits first, and requiring at least one, fixed that.
+    edits: list[FileEdit] = Field(min_length=1)
+    evidence_ids: list[str]
     root_cause: str
     explanation: str
-    edits: list[FileEdit]
-    evidence_ids: list[str]
 
 
 def propose_fix(state: InvestigationState, runtime: Rt) -> dict:

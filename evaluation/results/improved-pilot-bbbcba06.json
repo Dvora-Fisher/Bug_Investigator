@@ -1,0 +1,326 @@
+{
+  "experiment": "improved-pilot-bbbcba06",
+  "mode": "improved",
+  "finished_at": "2026-11-23T18:55:09.041090+00:00",
+  "scenarios": 4,
+  "total_spend_usd": 0.0188,
+  "summary": {
+    "bug_reproduced": 0.5,
+    "cost_usd": 0.0046,
+    "file_localization": 1.0,
+    "fix_success": 1.0,
+    "function_localization": 1.0,
+    "root_cause_accuracy": 1.0,
+    "tests_pass_after_fix": 1.0,
+    "unsupported_claim_rate": 0.0
+  },
+  "rows": [
+    {
+      "scenario": "py-regression",
+      "language": "Python",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "checkout/coupons.py"
+        ],
+        "leading_file": "checkout/coupons.py",
+        "leading_symbol": "apply_coupons",
+        "root_cause": "In checkout/coupons.py, apply_coupons uses a mutable default argument `coupons: list[float] = []`. Python evaluates this default once at function definition, so the same list object is shared across all calls. Each call appends the customer's new_coupons into that shared list and never clears it, so coupons from earlier checkouts in the same process are applied to later carts. Restarting the process recreates the default list, which matches the report.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: checkout/coupons.py uses a mutable default argument or a module-level/class-level list/dict to hold applied coupons; it is never reset per checkout, so coupons appended by earlier customers persist in the same process and are applied to later carts. Restarting clears the list, matching the report.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: checkout/coupons.py uses a mutable default argument or a module-level/class-level list/dict to hold applied coupons; it is never reset per checkout, so coupons appended by earlier customers persist in the same process and are applied to later carts. Restarting clears the list, matching the report.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: In checkout/coupons.py, apply_coupons uses a mutable default argument `coupons: list[float] = []`. Python evaluates this default once at function definition, so the same list object is shared across all calls. Each call appends the customer's new_coupons into that shared list and never clears it, so coupons from earlier checkouts in the same process are applied to later carts. Restarting the process recreates the default list, which matches the report.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: Custom repro: apply_coupons(100, [10]) returns 90.0, then apply_coupons(100) with no coupons (a new customer) also returns 90.0 instead of 100.0. Cause: checkout/coupons.py line 4 uses the mutable default `coupons: list[float] = []`, which persists across calls and accumulates entries via append on line 7. The existing test suite passed (E3) and did not cover this.",
+            "evidence_ids": [
+              "E4",
+              "E5"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 7,
+        "llm_calls": 8,
+        "cost_usd": 0.0027708200000000002,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00277
+      }
+    },
+    {
+      "scenario": "js-api-error",
+      "language": "JavaScript",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "src/api.js"
+        ],
+        "leading_file": "src/api.js",
+        "leading_symbol": "fullName",
+        "root_cause": "fetchProfile in src/api.js ignores the HTTP status. It always returns res.json(), so a 404 response body (or an error body from a failing API) becomes a truthy object without firstName/lastName. fullName then sees a truthy profile and interpolates undefined. The documented contract (return null on 404, throw ApiError otherwise) is not implemented.</root_cause>\n<parameter name=\"explanation\">Add a 404 check that returns null, so fullName yields \"Unknown user\" for deleted users, and a !res.ok check that throws ApiError, so the page can show an error instead of \"undefined undefined\" when the API is down. The camelCase field names match the test fixture and the existing fullName, so no key renaming is needed. H5 (snake_case mismatch) is rejected: the only evidence that appeared to support it, E10, was a literal search that did not match alternation and found nothing either way.</explanation>\n<parameter name=\"evidence_ids\">[\"E19\",\"E18\",\"E17\"]",
+        "reproduced": false,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: In src/api.js the user-fetch function does not check response.ok or the presence of the user object before returning; when the API returns an error or a null/deleted user, it returns an object lacking first_name/last_name, so the caller concatenates undefined values and displays 'undefined undefined'.",
+            "evidence_ids": [
+              "E6",
+              "E4"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H4 supported: src/api.js::fetchProfile returns res.json() without checking res.ok, so a 404 or 5xx error body (truthy, lacking firstName/lastName) is passed to fullName; fullName's 'Unknown user' fallback only triggers on falsy input, so the template literal prints 'undefined undefined'. The fix is to check res.ok and return null (or throw) so the existing fallback and error path are reached.",
+            "evidence_ids": [
+              "E9",
+              "E8"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: fetchProfile in src/api.js ignores the HTTP status. It always returns res.json(), so a 404 response body (or an error body from a failing API) becomes a truthy object without firstName/lastName. fullName then sees a truthy profile and interpolates undefined. The documented contract (return null on 404, throw ApiError otherwise) is not implemented.</root_cause>\n<parameter name=\"explanation\">Add a 404 check that returns null, so fullName yields \"Unknown user\" for deleted users, and a !res.ok check that throws ApiError, so the page can show an error instead of \"undefined undefined\" when the API is down. The camelCase field names match the test fixture and the existing fullName, so no key renaming is needed. H5 (snake_case mismatch) is rejected: the only evidence that appeared to support it, E10, was a literal search that did not match alternation and found nothing either way.</explanation>\n<parameter name=\"evidence_ids\">[\"E19\",\"E18\",\"E17\"]",
+            "evidence_ids": [
+              "E19",
+              "E18",
+              "E17"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 2,
+        "fix_attempts": 1,
+        "evidence_items": 20,
+        "llm_calls": 20,
+        "cost_usd": 0.00594252,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 0.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00594
+      }
+    },
+    {
+      "scenario": "ts-async-exception",
+      "language": "TypeScript",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "src/importer.ts"
+        ],
+        "leading_file": "src/importer.ts",
+        "leading_symbol": "runImport",
+        "root_cause": "In importBatch (src/importer.ts), records.map((r) => save(r)) starts every save but never awaits the returned promises. The try/catch therefore only sees synchronous throws. The function returns { ok: true } immediately, and any rejected save (e.g. \"duplicate key\") becomes an unhandled promise rejection instead of being caught and reported as ok: false.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: In src/importer.ts, the batch loop calls the async save helper without awaiting it or collecting its promise (fire-and-forget, e.g. forEach with async callback or missing await/Promise.all), so save rejections are never caught, the imported counter is incremented regardless, and ok is set to true before the rejection fires as an unhandled promise rejection.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H3 supported: The batch wrapper computes ok from a check that only tests for thrown synchronous errors (e.g. try/catch around a non-awaited call) rather than rejected promises, so ok stays true while async duplicate key errors escape as unhandled rejections.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: In importBatch (src/importer.ts), records.map((r) => save(r)) starts every save but never awaits the returned promises. The try/catch therefore only sees synchronous throws. The function returns { ok: true } immediately, and any rejected save (e.g. \"duplicate key\") becomes an unhandled promise rejection instead of being caught and reported as ok: false.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: The existing suite (E3) passes and doesn't exercise failing saves. My repro (.investigator/repro/repro.ts) calls importBatch with 250 records where save() rejects with \"duplicate key\" for every 50th record. importBatch returned { ok: true, imported: 250 } (E7), and then the process died with an unhandled \"duplicate key\" rejection, exit code 1. Cause, from src/importer.ts (E4): line 10 is records.map((r) => save(r)) with no await or Promise.all, so the returned promises are never awaited and the try/catch never sees their rejections. The function reports ok: true, and the failure escapes as an unhandled rejection, matching the report.",
+            "evidence_ids": [
+              "E4",
+              "E7"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 9,
+        "llm_calls": 11,
+        "cost_usd": 0.00324801,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00325
+      }
+    },
+    {
+      "scenario": "cs-regression",
+      "language": "C#",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "src/Finance/Money.cs"
+        ],
+        "leading_file": "src/Finance/Money.cs",
+        "leading_symbol": "Round",
+        "root_cause": "Money.ToCents calls Math.Round(amount, 2) without a MidpointRounding argument, so it uses the default banker's rounding (ToEven). Exact half-cent values such as 2.345 round to the even neighbour 2.34, violating finance policy FIN-12, which requires halves to be rounded away from zero.",
+        "reproduced": false,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: Money.cs rounds with Math.Round using the default MidpointRounding.ToEven (banker's rounding) instead of AwayFromZero, so exact half-cent values like 2.345 round to the even neighbour 2.34 when the preceding digit is even. The v3.0 change likely dropped an explicit MidpointRounding argument or changed the rounding call.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: Money.cs rounds with Math.Round using the default MidpointRounding.ToEven (banker's rounding) instead of AwayFromZero, so exact half-cent values like 2.345 round to the even neighbour 2.34 when the preceding digit is even. The v3.0 change likely dropped an explicit MidpointRounding argument or changed the rounding call.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H4 supported: Money.ToCents calls Math.Round(amount, 2) without MidpointRounding.AwayFromZero, so the default ToEven mode maps exact half-cent values like 2.345 to the even neighbour 2.34 (and 2.355 to 2.36). Fixing the call to Math.Round(amount, 2, MidpointRounding.AwayFromZero) should restore FIN-12 behaviour.",
+            "evidence_ids": [
+              "E6"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H5 supported: LineTotal in Money.cs multiplies or sums values and rounds through the same ToCents path, so any invoice line total computed from unit price times quantity that lands on an exact half-cent is rounded with banker's rounding, producing the one-cent-low invoices. Verify that LineTotal does not round separately with another default-mode call.",
+            "evidence_ids": [
+              "E7",
+              "E6"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: Money.cs rounds with Math.Round using the default MidpointRounding.ToEven (banker's rounding) instead of AwayFromZero, so exact half-cent values like 2.345 round to the even neighbour 2.34 when the preceding digit is even. The v3.0 change likely dropped an explicit MidpointRounding argument or changed the rounding call.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: Money.ToCents calls Math.Round(amount, 2) without a MidpointRounding argument, so it uses the default banker's rounding (ToEven). Exact half-cent values such as 2.345 round to the even neighbour 2.34, violating finance policy FIN-12, which requires halves to be rounded away from zero.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 2,
+        "fix_attempts": 1,
+        "evidence_items": 13,
+        "llm_calls": 19,
+        "cost_usd": 0.00633501,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 0.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00634
+      }
+    }
+  ]
+}

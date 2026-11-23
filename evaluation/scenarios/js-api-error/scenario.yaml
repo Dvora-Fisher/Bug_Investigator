@@ -1,0 +1,23 @@
+id: js-api-error
+language: JavaScript
+category: api-error
+bug:
+  description: >
+    The profile page shows "undefined undefined" as the name for deleted users instead of "Unknown user".
+    When the API is down, the page also shows "undefined undefined" instead of an error message.
+  error_output: ""
+expected:
+  file: src/api.js
+  symbol: fetchProfile
+  root_cause: fetchProfile never checks res.ok / res.status, so a 404 or 500 error body is returned as if it were a profile.
+  fix: Return null for 404 and throw ApiError for other non-OK responses before calling res.json().
+reference_fix:
+  - path: src/api.js
+    old: |2
+        const res = await fetchImpl(`/api/users/${id}`);
+        return res.json();
+    new: |2
+        const res = await fetchImpl(`/api/users/${id}`);
+        if (res.status === 404) return null;
+        if (!res.ok) throw new ApiError(res.status, `profile request failed: ${res.status}`);
+        return res.json();

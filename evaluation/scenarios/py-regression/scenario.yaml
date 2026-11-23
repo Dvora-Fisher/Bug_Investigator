@@ -1,0 +1,21 @@
+id: py-regression
+language: Python
+category: regression
+bug:
+  description: >
+    Since release 2.1 customers get discounts they never entered: the first checkout of the day is
+    correct, but later checkouts in the same server process also apply coupons from earlier customers.
+    Restarting the server "fixes" it until the next coupon is used.
+  error_output: ""
+expected:
+  file: checkout/coupons.py
+  symbol: apply_coupons
+  root_cause: The 2.1 refactor added a mutable default argument (coupons=[]); the same list is shared by every call, so coupons accumulate across checkouts.
+  fix: Do not use a mutable default; build a fresh list per call (e.g. coupons=None, then coupons = list(...)).
+reference_fix:
+  - path: checkout/coupons.py
+    old: |2
+          for c in new_coupons or []:
+              coupons.append(c)
+    new: |2
+          coupons = [*coupons, *(new_coupons or [])]

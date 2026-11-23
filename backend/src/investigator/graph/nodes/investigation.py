@@ -128,15 +128,17 @@ def challenge_hypothesis(state: InvestigationState, runtime: Rt) -> dict:
     leader = leading_hypothesis(state)
     if leader is None:
         return {}
+    reviewed = cited_evidence(state, leader.id)
     user = "\n\n".join([
         bug_block(state),
         f"## Leading hypothesis\n{hypotheses_block([leader])}",
-        f"## Evidence cited for it\n{evidence_block(cited_evidence(state, leader.id))}",
+        f"## Evidence cited for it\n{evidence_block(reviewed)}",
     ])
     verdict = runtime.context.reasoner.structured(
         "challenge_hypothesis", system_prompt("challenge", state["options"].mode), user, ChallengeVerdict)
+    # The verdict is a judgement about exactly the evidence it reviewed, so it cites that evidence.
     finding = Finding(hypothesis_id=leader.id, verdict="supported" if verdict.holds else "refuted",
-                      evidence_ids=[], note=f"Challenge: {verdict.reason}")
+                      evidence_ids=[e.id for e in reviewed], note=f"Challenge: {verdict.reason}")
     return {"hypotheses": _apply_verdicts(state["hypotheses"], [finding]), "findings": [finding]}
 
 

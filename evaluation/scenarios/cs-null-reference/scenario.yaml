@@ -1,0 +1,20 @@
+id: cs-null-reference
+language: C#
+category: null-reference
+bug:
+  description: >
+    Generating invoices crashes for orders of customers that were deleted from the CRM.
+    Those invoices should show "Unknown customer" as the name.
+  error_output: |
+    Unhandled exception. System.NullReferenceException: Object reference not set to an instance of an object.
+       at Crm.CustomerService.DisplayName(Int32 id) in /src/Crm/CustomerService.cs:line 16
+       at Invoicing.InvoiceBuilder.Build(Order order) in /src/Invoicing/InvoiceBuilder.cs:line 33
+expected:
+  file: src/Crm/CustomerService.cs
+  symbol: DisplayName
+  root_cause: DisplayName uses the null-forgiving operator on repository.Find(id), which returns null for deleted customers, and then dereferences .Name.
+  fix: Check for null and return UnknownCustomer, e.g. repository.Find(id)?.Name.Trim() ?? UnknownCustomer.
+reference_fix:
+  - path: src/Crm/CustomerService.cs
+    old: "repository.Find(id)!.Name.Trim();"
+    new: "repository.Find(id)?.Name.Trim() ?? UnknownCustomer;"

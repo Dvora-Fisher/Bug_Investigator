@@ -1,0 +1,18 @@
+id: cs-off-by-one
+language: C#
+category: off-by-one
+bug:
+  description: >
+    The "average of the last N days" widget crashes for every value of N.
+  error_output: |
+    System.IndexOutOfRangeException: Index was outside the bounds of the array.
+       at Analytics.Stats.AverageOfLast(Int32[] values, Int32 k) in /src/Analytics/Stats.cs:line 16
+expected:
+  file: src/Analytics/Stats.cs
+  symbol: AverageOfLast
+  root_cause: The loop condition is i <= values.Length, so the last iteration reads values[values.Length], one past the end of the array.
+  fix: Use i < values.Length.
+reference_fix:
+  - path: src/Analytics/Stats.cs
+    old: "i <= values.Length; i++"
+    new: "i < values.Length; i++"

@@ -1,0 +1,17 @@
+id: cs-regression
+language: C#
+category: regression
+bug:
+  description: >
+    Since the v3.0 release some invoices are one cent lower than the accounting system expects,
+    e.g. an amount of 2.345 is billed as 2.34 instead of 2.35. Before v3.0 they always matched.
+  error_output: ""
+expected:
+  file: src/Finance/Money.cs
+  symbol: ToCents
+  root_cause: Math.Round(decimal, int) uses banker's rounding (MidpointRounding.ToEven) by default, so 2.345 rounds to 2.34; policy FIN-12 requires rounding halves away from zero.
+  fix: Use Math.Round(amount, 2, MidpointRounding.AwayFromZero).
+reference_fix:
+  - path: src/Finance/Money.cs
+    old: "Math.Round(amount, 2);"
+    new: "Math.Round(amount, 2, MidpointRounding.AwayFromZero);"

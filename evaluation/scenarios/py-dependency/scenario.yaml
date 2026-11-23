@@ -1,0 +1,21 @@
+id: py-dependency
+language: Python
+category: dependency
+bug:
+  description: >
+    On a freshly provisioned server, installing from requirements.txt and starting the service fails
+    immediately. It works on the developer's laptop.
+  error_output: |
+    Traceback (most recent call last):
+      File "/srv/settings_loader/loader.py", line 3, in <module>
+        import yaml
+    ModuleNotFoundError: No module named 'yaml'
+expected:
+  file: requirements.txt
+  symbol: ""
+  root_cause: The code imports yaml (PyYAML), but PyYAML is not declared in requirements.txt; it only happened to be installed on the developer's machine.
+  fix: Add PyYAML to requirements.txt.
+reference_fix:
+  - path: requirements.txt
+    old: "pytest\n"
+    new: "pytest\nPyYAML\n"

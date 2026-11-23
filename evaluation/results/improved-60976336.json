@@ -1,0 +1,1492 @@
+{
+  "experiment": "improved-60976336",
+  "mode": "improved",
+  "finished_at": "2026-11-23T18:18:47.959531+00:00",
+  "scenarios": 20,
+  "total_spend_usd": 0.0814,
+  "summary": {
+    "bug_reproduced": 0.8333,
+    "cost_usd": 0.004,
+    "file_localization": 1.0,
+    "fix_success": 0.7222,
+    "function_localization": 1.0,
+    "root_cause_accuracy": 1.0,
+    "tests_pass_after_fix": 0.7222,
+    "unsupported_claim_rate": 0.0
+  },
+  "rows": [
+    {
+      "scenario": "js-api-error",
+      "language": "JavaScript",
+      "outputs": {
+        "outcome": "stopped",
+        "files": [
+          "src/api.js"
+        ],
+        "leading_file": "src/api.js",
+        "leading_symbol": "fullName",
+        "root_cause": "fetchProfile in src/api.js does not implement the contract documented in its own docstring. The docstring says it returns null for HTTP 404 (user does not exist or was deleted) and throws ApiError for any other failed response. The implementation ignores res.status and res.ok and returns res.json() unconditionally. A 404 or 5xx error body is therefore returned as a truthy \"profile\" object with no firstName/lastName, so fullName() builds \"undefined undefined\" from it instead of receiving null and returning \"Unknown user\". The ApiError class defined at the top of the same file is never used.",
+        "reproduced": true,
+        "verified": false,
+        "hidden_tests_passed": null,
+        "claims": [
+          {
+            "claim": "H4 supported: src/api.js::fetchProfile does not check res.ok or status before returning res.json(). For a 404 (deleted user) or 5xx (API down) the error body is parsed and returned as a non-null profile, so fullName's falsy-profile guard is bypassed and firstName + ' ' + lastName yields 'undefined undefined'. The documented null-on-404 and ApiError-otherwise behaviour is not implemented.",
+            "evidence_ids": [
+              "E7",
+              "E6"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: fetchProfile in src/api.js does not implement the contract documented in its own docstring. The docstring says it returns null for HTTP 404 (user does not exist or was deleted) and throws ApiError for any other failed response. The implementation ignores res.status and res.ok and returns res.json() unconditionally. A 404 or 5xx error body is therefore returned as a truthy \"profile\" object with no firstName/lastName, so fullName() builds \"undefined undefined\" from it instead of receiving null and returning \"Unknown user\". The ApiError class defined at the top of the same file is never used.",
+            "evidence_ids": [
+              "E7"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: The existing suite (E8) only tests the success path and passes, so it does not show the bug. A repro script (.investigator/repro/repro.mjs) calls fetchProfile with a fake fetch and passes the result to fullName. It renders \"undefined undefined\" for a 404 with an error body, a 500 with an error body, and a 200 deleted-user object with no name fields. fetchProfile (src/api.js, E9) returns res.json() without checking res.ok, and fullName only guards against a null profile, so the bug is confirmed (E11).",
+            "evidence_ids": [
+              "E11",
+              "E9"
+            ],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 2,
+        "fix_attempts": 1,
+        "evidence_items": 13,
+        "llm_calls": 20,
+        "cost_usd": 0.00804405,
+        "halt_reason": "propose_fix: propose_fix: no valid FixProposal after 3 tool steps"
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 0.0,
+        "tests_pass_after_fix": 0.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00804
+      }
+    },
+    {
+      "scenario": "cs-logic-error",
+      "language": "C#",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "src/Billing/InvoiceCalculator.cs"
+        ],
+        "leading_file": "src/Billing/InvoiceCalculator.cs",
+        "leading_symbol": "InvoiceCalculator",
+        "root_cause": "The discount guard in InvoiceCalculator.Total uses a strict comparison (subtotal > DiscountThreshold), so a subtotal of exactly DiscountThreshold (100) does not receive the discount. The documented policy (summary comment: \"Orders of DiscountThreshold or more get a DiscountRate discount\") requires an inclusive comparison.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: The discount condition in InvoiceCalculator uses a strict comparison (e.g. total > 100) instead of total >= 100, so the exact boundary value of 100 falls outside the discount branch.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: The discount condition in InvoiceCalculator uses a strict comparison (e.g. total > 100) instead of total >= 100, so the exact boundary value of 100 falls outside the discount branch.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: The discount guard in InvoiceCalculator.Total uses a strict comparison (subtotal > DiscountThreshold), so a subtotal of exactly DiscountThreshold (100) does not receive the discount. The documented policy (summary comment: \"Orders of DiscountThreshold or more get a DiscountRate discount\") requires an inclusive comparison.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: Existing test InvoiceCalculatorTests.OrderOfExactlyOneHundredGetsTheDiscount fails at tests/Billing.Tests/InvoiceCalculatorTests.cs:16 with \"Assert.Equal() Failure: Expected: 90, Actual: 100\". A cart totalling exactly 100 is charged the full amount instead of the 10%-discounted 90, matching the bug report. The other two tests pass (Failed: 1, Passed: 2).",
+            "evidence_ids": [
+              "E3"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 4,
+        "llm_calls": 7,
+        "cost_usd": 0.00253634,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00254
+      }
+    },
+    {
+      "scenario": "py-off-by-one",
+      "language": "Python",
+      "outputs": {
+        "outcome": "stopped",
+        "files": [
+          "stats/moving.py"
+        ],
+        "leading_file": "stats/moving.py",
+        "leading_symbol": "moving_average",
+        "root_cause": "(unverified) The loop in moving_average in stats/moving.py iterates over range(len(values) - window) instead of range(len(values) - window + 1), so the last valid window is never computed; with window == length the range is empty and yields [].",
+        "reproduced": true,
+        "verified": null,
+        "hidden_tests_passed": null,
+        "claims": [
+          {
+            "claim": "H1 supported: The loop in moving_average in stats/moving.py iterates over range(len(values) - window) instead of range(len(values) - window + 1), so the last valid window is never computed; with window == length the range is empty and yields [].",
+            "evidence_ids": [
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: The loop in moving_average in stats/moving.py iterates over range(len(values) - window) instead of range(len(values) - window + 1), so the last valid window is never computed; with window == length the range is empty and yields [].",
+            "evidence_ids": [
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: Existing test suite (python -m pytest) fails with the reported behaviour: test_window_of_two gets [1.5, 2.5] instead of [1.5, 2.5, 3.5] for moving_average([1, 2, 3, 4], 2), and test_window_equal_to_length gets [] instead of [4.0] for moving_average([2, 4, 6], 3). Both match the bug report exactly.",
+            "evidence_ids": [
+              "E3"
+            ],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 0,
+        "evidence_items": 3,
+        "llm_calls": 10,
+        "cost_usd": 0.00309006,
+        "halt_reason": "propose_fix: propose_fix: no valid FixProposal after 3 tool steps"
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 0.0,
+        "tests_pass_after_fix": 0.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00309
+      }
+    },
+    {
+      "scenario": "js-logic-sort",
+      "language": "JavaScript",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "src/leaderboard.js"
+        ],
+        "leading_file": "src/leaderboard.js",
+        "leading_symbol": "sort",
+        "root_cause": "In src/leaderboard.js, topScores calls [...scores].sort() with no comparator. JavaScript's default sort compares elements as strings, so '100' sorts before '9'. The following .reverse() then places '9' above '100'. This is why the ranking only looks correct when all scores have the same digit count.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: The sort comparator in src/leaderboard.js compares score values as strings (e.g. using localeCompare or default string comparison, or scores stored as strings), so '9' sorts above '100' lexicographically instead of numerically.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: The sort comparator in src/leaderboard.js compares score values as strings (e.g. using localeCompare or default string comparison, or scores stored as strings), so '9' sorts above '100' lexicographically instead of numerically.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: In src/leaderboard.js, topScores calls [...scores].sort() with no comparator. JavaScript's default sort compares elements as strings, so '100' sorts before '9'. The following .reverse() then places '9' above '100'. This is why the ranking only looks correct when all scores have the same digit count.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: The existing test suite already shows the reported behaviour. The test \"top scores with different digit counts\" (test/leaderboard.test.js:9) fails with a deepStrictEqual mismatch: actual [9, 7] vs expected [100, 25]. The player with 9 points is ranked above the player with 100 points, and the test passes only when digit counts match (\"top three\" passes).",
+            "evidence_ids": [
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 3,
+        "llm_calls": 8,
+        "cost_usd": 0.0028688200000000002,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00287
+      }
+    },
+    {
+      "scenario": "ts-null-reference",
+      "language": "TypeScript",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "src/users.ts"
+        ],
+        "leading_file": "src/users.ts",
+        "leading_symbol": "displayName",
+        "root_cause": "In displayName (src/users.ts, line 13), `user.profile!.nickname` uses a TypeScript non-null assertion on `profile`, which is declared optional (`profile?: Profile`). The assertion is erased at runtime, so for users without profile settings `user.profile` is undefined and reading `.nickname` throws the TypeError.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: In displayName, `user.profile!.nickname` dereferences an optional `profile` (declared `profile?: Profile` on User) with only a TypeScript non-null assertion; the assertion is erased at runtime, so users without a profile throw. The fix is to use optional chaining (`user.profile?.nickname`) so the code falls through to the email local-part branch.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: In displayName, `user.profile!.nickname` dereferences an optional `profile` (declared `profile?: Profile` on User) with only a TypeScript non-null assertion; the assertion is erased at runtime, so users without a profile throw. The fix is to use optional chaining (`user.profile?.nickname`) so the code falls through to the email local-part branch.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: In displayName (src/users.ts, line 13), `user.profile!.nickname` uses a TypeScript non-null assertion on `profile`, which is declared optional (`profile?: Profile`). The assertion is erased at runtime, so for users without profile settings `user.profile` is undefined and reading `.nickname` throws the TypeError.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: The existing test suite (npm test) reproduces the bug. Subtest 2 \"falls back to the email name without a profile\" fails with TypeError: Cannot read properties of undefined (reading 'nickname') at displayName (src/users.ts:13). Subtest 3 \"lists names for a mixed set of users\" fails with the same error via listNames, matching the reported stack trace. Subtest 1 (user with a nickname) passes, so the crash only happens for users without a profile.",
+            "evidence_ids": [
+              "E3"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 4,
+        "llm_calls": 6,
+        "cost_usd": 0.00230048,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.0023
+      }
+    },
+    {
+      "scenario": "py-infinite-loop",
+      "language": "Python",
+      "outputs": {
+        "outcome": "stopped",
+        "files": [
+          "search/bisect_tools.py"
+        ],
+        "leading_file": "search/bisect_tools.py",
+        "leading_symbol": "first_at_least",
+        "root_cause": "(unverified) In first_at_least, the binary search loop updates lo or hi without advancing past mid when the target lies beyond the first element (e.g. assigning lo = mid instead of mid + 1), so the range never shrinks and the while loop spins forever for targets like 6.",
+        "reproduced": true,
+        "verified": null,
+        "hidden_tests_passed": null,
+        "claims": [
+          {
+            "claim": "H1 supported: In first_at_least, the binary search loop updates lo or hi without advancing past mid when the target lies beyond the first element (e.g. assigning lo = mid instead of mid + 1), so the range never shrinks and the while loop spins forever for targets like 6.",
+            "evidence_ids": [
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H3 supported: The comparison branch in first_at_least uses the wrong direction or a non-advancing update when items[mid] < target, so a target greater than the first element always takes the branch that does not move the bounds.",
+            "evidence_ids": [
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: In first_at_least, the binary search loop updates lo or hi without advancing past mid when the target lies beyond the first element (e.g. assigning lo = mid instead of mid + 1), so the range never shrinks and the while loop spins forever for targets like 6.",
+            "evidence_ids": [
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: The existing suite already shows the hang. test_bisect.py::test_target_in_the_middle calls first_at_least([1, 3, 5, 7], 5) through finishes_within(2, ...) and the call is still running after 2s, so the test fails with \"did not finish within 2s (infinite loop?)\". The reported case first_at_least([1, 3, 5, 7], 6) is the same class of input (target above the first element, the search never returns), and the other test (small target) passes. The test uses target 5 rather than 6, so this is the same symptom on a closely related input, not the exact reported input.",
+            "evidence_ids": [
+              "E3"
+            ],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 0,
+        "evidence_items": 3,
+        "llm_calls": 10,
+        "cost_usd": 0.00445528,
+        "halt_reason": "propose_fix: propose_fix: no valid FixProposal after 3 tool steps"
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 0.0,
+        "tests_pass_after_fix": 0.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00446
+      }
+    },
+    {
+      "scenario": "py-race-condition",
+      "language": "Python",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "metrics/counter.py"
+        ],
+        "leading_file": "metrics/counter.py",
+        "leading_symbol": "PageCounter",
+        "root_cause": "HitCounter.hit() performs a non-atomic read-modify-write on self.value (read at line 13, sleep at line 14, write at line 15) without holding self._lock. The lock is created in __init__ (line 10) but never acquired, so concurrent threads read the same value and overwrite each other's increments, losing updates.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: The hit counter increment in metrics/counter.py is a non-atomic read-modify-write (e.g. self.count += 1 or a dict get/set) performed without a lock, so concurrent threads overwrite each other's updates and lose increments.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H2 supported: A threading.Lock exists in metrics/counter.py but is not held around the increment path (or is created per call / per instance), so mutual exclusion does not actually protect the shared count.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: HitCounter.hit() performs a non-atomic read-modify-write on self.value (read at line 13, sleep at line 14, write at line 15) without holding self._lock. The lock is created in __init__ (line 10) but never acquired, so concurrent threads read the same value and overwrite each other's increments, losing updates.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: Existing test suite: tests/test_counter.py::test_many_threads fails with `assert count_concurrently(threads=8, hits_per_thread=250) == 2000` returning 258 (AssertionError at tests/test_counter.py:12). The single-threaded test passes, matching the report that single-thread counting is correct. Only a few hundred of 2000 concurrent hits are recorded.",
+            "evidence_ids": [
+              "E3"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 4,
+        "llm_calls": 8,
+        "cost_usd": 0.00295122,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00295
+      }
+    },
+    {
+      "scenario": "py-exception-handling",
+      "language": "Python",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "billing/amounts.py"
+        ],
+        "leading_file": "billing/amounts.py",
+        "leading_symbol": "parse_amount",
+        "root_cause": "parse_amount wraps Decimal() in a broad `except Exception` and returns Decimal(0) on failure. Malformed input such as \"12,5O\" therefore becomes 0 and is silently charged, instead of being rejected as the docstring requires.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: parse_amount in billing/amounts.py catches the ValueError raised by float()/Decimal conversion inside a broad try/except and returns a default of 0 instead of re-raising, so any unparseable string yields 0.",
+            "evidence_ids": [
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: parse_amount in billing/amounts.py catches the ValueError raised by float()/Decimal conversion inside a broad try/except and returns a default of 0 instead of re-raising, so any unparseable string yields 0.",
+            "evidence_ids": [
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: parse_amount wraps Decimal() in a broad `except Exception` and returns Decimal(0) on failure. Malformed input such as \"12,5O\" therefore becomes 0 and is silently charged, instead of being rejected as the docstring requires.",
+            "evidence_ids": [
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: The existing suite run shows tests/test_amounts.py::test_rejects_garbage failing with \"DID NOT RAISE ValueError\" at tests/test_amounts.py:13. The test expects parse_amount to raise ValueError for malformed input, but the call returns without raising, which matches the report that malformed amounts are accepted instead of rejected.",
+            "evidence_ids": [
+              "E3"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 4,
+        "llm_calls": 7,
+        "cost_usd": 0.0023927,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00239
+      }
+    },
+    {
+      "scenario": "ts-infinite-loop",
+      "language": "TypeScript",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "src/paging.ts"
+        ],
+        "leading_file": "src/paging.ts",
+        "leading_symbol": "fetchAll",
+        "root_cause": "In src/paging.ts, fetchAll declares `cursor` as a `const` fixed at `null` and never updates it. Every iteration calls getPage(null), so it always fetches the first page. For multi-page data, `page.next` is non-null, so the `do...while` condition never becomes false, and `items.push(...page.items)` keeps appending the same page until the heap is exhausted [E3].",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: The pagination loop in src/paging.ts never advances the page cursor (or the termination check compares against the wrong value, e.g. page count vs. zero-based index), so after the first page the loop keeps requesting the same page or never sees an end condition, accumulating results in memory until OOM.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H4 supported: src/paging.ts::fetchAll declares cursor as a const fixed at null (line 11) and never reassigns it to page.next, so getPage(cursor) on line 14 always requests the first page; its next is non-null for multi-page data, so the loop on line 16 never exits and items.push(...page.items) on line 15 grows the array until OOM. The export caller linkage to fetchAll is not yet verified.",
+            "evidence_ids": [
+              "E3"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H4 supported: src/paging.ts::fetchAll declares cursor as a const fixed at null (line 11) and never reassigns it to page.next, so getPage(cursor) on line 14 always requests the first page; its next is non-null for multi-page data, so the loop on line 16 never exits and items.push(...page.items) on line 15 grows the array until OOM. The export caller linkage to fetchAll is not yet verified.",
+            "evidence_ids": [
+              "E3"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: In src/paging.ts, fetchAll declares `cursor` as a `const` fixed at `null` and never updates it. Every iteration calls getPage(null), so it always fetches the first page. For multi-page data, `page.next` is non-null, so the `do...while` condition never becomes false, and `items.push(...page.items)` keeps appending the same page until the heap is exhausted [E3].",
+            "evidence_ids": [
+              "E3"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: Wrote a two-page fake API repro (.investigator/repro/repro.ts) that calls fetchAll from src/paging.ts. It requested cursors [null,null,null,...] and hit the 10-call guard with \"runaway loop\", so fetchAll never advanced past the first page. This matches the report: cursor is const null (src/paging.ts line 11) and is never set to page.next, so getPage(null) repeats forever while items grow. The existing suite only has a single-page test (E5), so it does not exercise this path. The export caller's link to fetchAll is still unverified.",
+            "evidence_ids": [
+              "E5",
+              "E6",
+              "E10"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 2,
+        "fix_attempts": 1,
+        "evidence_items": 12,
+        "llm_calls": 15,
+        "cost_usd": 0.00562836,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00563
+      }
+    },
+    {
+      "scenario": "py-sql",
+      "language": "Python",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "shop/orders.py"
+        ],
+        "leading_file": "shop/orders.py",
+        "leading_symbol": "orders_for",
+        "root_cause": "orders_for interpolates the raw customer name into the SQL string with an f-string inside single quotes. A name containing an apostrophe (O'Brien) terminates the string literal early, producing invalid SQL.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: In shop/orders.py, orders_for builds the query with an f-string that embeds the raw customer name inside single quotes (WHERE customer = '{customer}'). An apostrophe in the name, such as O'Brien, closes the SQL string literal, producing invalid SQL that SQLite rejects near \"Brien\". The fix is to pass customer as a bound parameter using a ? placeholder and conn.execute(query, (customer,)).",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: In shop/orders.py, orders_for builds the query with an f-string that embeds the raw customer name inside single quotes (WHERE customer = '{customer}'). An apostrophe in the name, such as O'Brien, closes the SQL string literal, producing invalid SQL that SQLite rejects near \"Brien\". The fix is to pass customer as a bound parameter using a ? placeholder and conn.execute(query, (customer,)).",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: orders_for interpolates the raw customer name into the SQL string with an f-string inside single quotes. A name containing an apostrophe (O'Brien) terminates the string literal early, producing invalid SQL.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: Ran a script that adds orders for \"O'Brien\" and \"Smith\" and calls orders_for(conn, \"O'Brien\"). It crashes with sqlite3.OperationalError: near \"Brien\": syntax error at shop/orders.py line 21, matching the report. The cause is the f-string on line 20 (shop/orders.py) that interpolates the raw name into WHERE customer = '...'. The existing test suite passed and does not cover apostrophes, so it did not show the bug.",
+            "evidence_ids": [
+              "E4",
+              "E5"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 7,
+        "llm_calls": 9,
+        "cost_usd": 0.00257798,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00258
+      }
+    },
+    {
+      "scenario": "go-off-by-one",
+      "language": "Go",
+      "outputs": {
+        "outcome": "fixed_unverified",
+        "files": [
+          "window/last.go"
+        ],
+        "leading_file": "window/last.go",
+        "leading_symbol": "LastN",
+        "root_cause": "In window/last.go, LastN computes the slice start as len(xs)-n-1 instead of len(xs)-n. This makes the returned slice include one extra element before the last n elements. For xs=[1 2 3 4 5] and n=2, the start index is 2, so the result is [3 4 5] instead of [4 5].",
+        "reproduced": false,
+        "verified": null,
+        "hidden_tests_passed": null,
+        "claims": [
+          {
+            "claim": "H1 supported: In LastN in window/last.go the start index is computed as len(xs)-n-1 (or equivalently an off-by-one in the slicing bound), so the returned slice starts one element too early, yielding [3 4 5] for input [1 2 3 4 5] with n=2.",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: In LastN in window/last.go the start index is computed as len(xs)-n-1 (or equivalently an off-by-one in the slicing bound), so the returned slice starts one element too early, yielding [3 4 5] for input [1 2 3 4 5] with n=2.",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: In window/last.go, LastN computes the slice start as len(xs)-n-1 instead of len(xs)-n. This makes the returned slice include one extra element before the last n elements. For xs=[1 2 3 4 5] and n=2, the start index is 2, so the result is [3 4 5] instead of [4 5].",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 2,
+        "llm_calls": 5,
+        "cost_usd": 0.00161499,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": null,
+        "fix_success": null,
+        "tests_pass_after_fix": null,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00161
+      }
+    },
+    {
+      "scenario": "py-regression",
+      "language": "Python",
+      "outputs": {
+        "outcome": "stopped",
+        "files": [
+          "checkout/coupons.py"
+        ],
+        "leading_file": "checkout/coupons.py",
+        "leading_symbol": "apply_coupons",
+        "root_cause": "(unverified) checkout/coupons.py uses a mutable default argument (e.g., a list or dict) in the function that applies coupons, so coupons appended in one checkout persist into subsequent calls that omit the argument; the 2.1 change likely introduced this default.",
+        "reproduced": true,
+        "verified": null,
+        "hidden_tests_passed": null,
+        "claims": [
+          {
+            "claim": "H1 supported: checkout/coupons.py uses a mutable default argument (e.g., a list or dict) in the function that applies coupons, so coupons appended in one checkout persist into subsequent calls that omit the argument; the 2.1 change likely introduced this default.",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: checkout/coupons.py uses a mutable default argument (e.g., a list or dict) in the function that applies coupons, so coupons appended in one checkout persist into subsequent calls that omit the argument; the 2.1 change likely introduced this default.",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: The existing suite passes but only tests a single call with no coupons, so it does not exercise the bug. A repro calls apply_coupons(100.0, [10]) and then apply_coupons(100.0) with no coupon. The second call returns 90.0 instead of 100.0, so a discount from the first checkout leaks into the second. The cause is the mutable default `coupons: list[float] = []` in checkout/coupons.py (E4), which is appended to on every call that passes new_coupons (E4 lines 6-7).",
+            "evidence_ids": [
+              "E4",
+              "E6"
+            ],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 0,
+        "evidence_items": 6,
+        "llm_calls": 12,
+        "cost_usd": 0.00418494,
+        "halt_reason": "propose_fix: propose_fix: no valid FixProposal after 3 tool steps"
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 0.0,
+        "tests_pass_after_fix": 0.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00418
+      }
+    },
+    {
+      "scenario": "cs-off-by-one",
+      "language": "C#",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "src/Analytics/Stats.cs"
+        ],
+        "leading_file": "src/Analytics/Stats.cs",
+        "leading_symbol": "Stats.AverageOfLast",
+        "root_cause": "The loop in Stats.AverageOfLast runs while i <= values.Length. It starts at values.Length - k and so visits k + 1 indices, the last being values.Length, which is out of bounds for every valid k.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: The for-loop condition in Stats.AverageOfLast uses 'i <= values.Length' instead of 'i < values.Length', so on the final iteration it indexes values[values.Length], which is out of bounds for every valid k and causes the IndexOutOfRangeException at line 16 (the summation line).",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: The for-loop condition in Stats.AverageOfLast uses 'i <= values.Length' instead of 'i < values.Length', so on the final iteration it indexes values[values.Length], which is out of bounds for every valid k and causes the IndexOutOfRangeException at line 16 (the summation line).",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: The loop in Stats.AverageOfLast runs while i <= values.Length. It starts at values.Length - k and so visits k + 1 indices, the last being values.Length, which is out of bounds for every valid k.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: The existing test suite already reproduces the bug. StatsTests.AverageOfLastTwo fails with System.IndexOutOfRangeException at Analytics.Stats.AverageOfLast (src/Analytics/Stats.cs line 16), called from StatsTests.AverageOfLastTwo (tests/Analytics.Tests/StatsTests.cs line 7). The run reports 1 failed, 1 passed. This matches the report's exception and location.",
+            "evidence_ids": [
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 3,
+        "llm_calls": 6,
+        "cost_usd": 0.00213161,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00213
+      }
+    },
+    {
+      "scenario": "java-null-reference",
+      "language": "Java",
+      "outputs": {
+        "outcome": "fixed_unverified",
+        "files": [
+          "src/main/java/shop/Inventory.java"
+        ],
+        "leading_file": "src/main/java/shop/Inventory.java",
+        "leading_symbol": "Inventory.available",
+        "root_cause": "Inventory.available() returns stock.get(sku) directly. For a never-stocked SKU, HashMap.get returns null, and auto-unboxing to int throws NullPointerException. This contradicts the method's Javadoc, which says it returns 0 for unknown SKUs.",
+        "reproduced": false,
+        "verified": null,
+        "hidden_tests_passed": null,
+        "claims": [
+          {
+            "claim": "H1 supported: Inventory.available() contradicts its own Javadoc (\"0 for SKUs we have never stocked\") because it returns stock.get(sku) directly; the Map returns null for unknown keys and the auto-unboxing to int at line 15 throws NullPointerException. Fix: return stock.getOrDefault(sku, 0).",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: Inventory.available() contradicts its own Javadoc (\"0 for SKUs we have never stocked\") because it returns stock.get(sku) directly; the Map returns null for unknown keys and the auto-unboxing to int at line 15 throws NullPointerException. Fix: return stock.getOrDefault(sku, 0).",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: Inventory.available() returns stock.get(sku) directly. For a never-stocked SKU, HashMap.get returns null, and auto-unboxing to int throws NullPointerException. This contradicts the method's Javadoc, which says it returns 0 for unknown SKUs.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 1,
+        "llm_calls": 5,
+        "cost_usd": 0.00183421,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": null,
+        "fix_success": null,
+        "tests_pass_after_fix": null,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00183
+      }
+    },
+    {
+      "scenario": "cs-exception-handling",
+      "language": "C#",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "src/Reports/ReportExporter.cs"
+        ],
+        "leading_file": "src/Reports/ReportExporter.cs",
+        "leading_symbol": "Export",
+        "root_cause": "ReportExporter.Export catches every exception from writeFile (including IOException when the disk is full) with an empty catch block and then unconditionally returns true. The caller therefore always receives success, even when no file was written.",
+        "reproduced": false,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: ReportExporter's save method swallows IOException (e.g. an empty catch or catch-all) around the file write/stream flush, so the failure is never propagated and the caller displays the success message regardless of whether the file was created.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: ReportExporter's save method swallows IOException (e.g. an empty catch or catch-all) around the file write/stream flush, so the failure is never propagated and the caller displays the success message regardless of whether the file was created.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H4 supported: src/Reports/ReportExporter.cs::Export: the try/catch(Exception) around the injected writeFile(path, content) delegate has an empty '// ignore' catch body, so the disk-full failure is discarded and Export then returns true unconditionally, contradicting its doc comment promising false on failure; the caller therefore shows 'Report saved' with no file created.",
+            "evidence_ids": [
+              "E6"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: ReportExporter's save method swallows IOException (e.g. an empty catch or catch-all) around the file write/stream flush, so the failure is never propagated and the caller displays the success message regardless of whether the file was created.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: ReportExporter.Export catches every exception from writeFile (including IOException when the disk is full) with an empty catch block and then unconditionally returns true. The caller therefore always receives success, even when no file was written.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 2,
+        "fix_attempts": 1,
+        "evidence_items": 13,
+        "llm_calls": 15,
+        "cost_usd": 0.0054878,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 0.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00549
+      }
+    },
+    {
+      "scenario": "cs-null-reference",
+      "language": "C#",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "src/Crm/CustomerService.cs"
+        ],
+        "leading_file": "src/Crm/CustomerService.cs",
+        "leading_symbol": "CustomerService.DisplayName",
+        "root_cause": "CustomerService.DisplayName uses the null-forgiving operator (!) on repository.Find(id). Find returns null for deleted customers (documented in the interface, E1), so the code dereferences null on .Name and throws. The UnknownCustomer fallback is never reached because the null check is suppressed.",
+        "reproduced": false,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: CustomerService.DisplayName uses the null-forgiving operator on repository.Find(id) and never falls back to UnknownCustomer when Find returns null, so a deleted customer's id dereferences null on '.Name'. The fix is to return UnknownCustomer when the customer is missing (e.g. repository.Find(id)?.Name.Trim() ?? UnknownCustomer).",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H3 supported: Existing tests in CustomerServiceTests.cs likely cover only existing customers, so no test asserts the UnknownCustomer fallback for a missing id; this gap let the null path ship unnoticed.",
+            "evidence_ids": [
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: CustomerService.DisplayName uses the null-forgiving operator on repository.Find(id) and never falls back to UnknownCustomer when Find returns null, so a deleted customer's id dereferences null on '.Name'. The fix is to return UnknownCustomer when the customer is missing (e.g. repository.Find(id)?.Name.Trim() ?? UnknownCustomer).",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H4 supported: CustomerService.DisplayName dereferences repository.Find(id) with the null-forgiving operator and never falls back to UnknownCustomer when Find returns null; the fix is a null-conditional with a ?? UnknownCustomer fallback. Not yet verified: the InvoiceBuilder.cs call site could not be read.",
+            "evidence_ids": [
+              "E8",
+              "E9",
+              "E10"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H5 supported: Existing tests in CustomerServiceTests.cs only cover an existing customer, so no test asserts the UnknownCustomer fallback for a missing id, which let the null path ship unnoticed.",
+            "evidence_ids": [
+              "E9"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: CustomerService.DisplayName uses the null-forgiving operator on repository.Find(id) and never falls back to UnknownCustomer when Find returns null, so a deleted customer's id dereferences null on '.Name'. The fix is to return UnknownCustomer when the customer is missing (e.g. repository.Find(id)?.Name.Trim() ?? UnknownCustomer).",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: CustomerService.DisplayName uses the null-forgiving operator (!) on repository.Find(id). Find returns null for deleted customers (documented in the interface, E1), so the code dereferences null on .Name and throws. The UnknownCustomer fallback is never reached because the null check is suppressed.",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 2,
+        "fix_attempts": 1,
+        "evidence_items": 16,
+        "llm_calls": 20,
+        "cost_usd": 0.00746796,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 0.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00747
+      }
+    },
+    {
+      "scenario": "py-dependency",
+      "language": "Python",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "requirements.txt"
+        ],
+        "leading_file": "settings_loader/loader.py",
+        "leading_symbol": "load_settings",
+        "root_cause": "requirements.txt declares only pytest and omits PyYAML, but settings_loader/loader.py imports yaml at module level (line 3). On a fresh server, pip install -r requirements.txt therefore never installs yaml, and importing the package raises ModuleNotFoundError at startup.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: requirements.txt is missing the runtime dependency PyYAML: its only entry is 'pytest', so 'pip install -r requirements.txt' never installs the 'yaml' module that settings_loader/loader.py imports at line 3. The laptop works only because PyYAML was installed there manually or via another environment.",
+            "evidence_ids": [
+              "E1",
+              "E2",
+              "E3"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H2 supported: The module-level import 'import yaml' in settings_loader/loader.py line 3 makes the whole package fail at import time on any server lacking PyYAML, so the service dies immediately rather than at the first settings load call.",
+            "evidence_ids": [
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: requirements.txt declares only pytest and omits PyYAML, but settings_loader/loader.py imports yaml at module level (line 3). On a fresh server, pip install -r requirements.txt therefore never installs yaml, and importing the package raises ModuleNotFoundError at startup.",
+            "evidence_ids": [
+              "E2",
+              "E5"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: The existing test suite (python -m pytest) fails during collection of tests/test_loader.py. The traceback shows settings_loader/loader.py:3 doing `import yaml`, which raises ModuleNotFoundError: No module named 'yaml'. This matches the reported crash on import. The run was interrupted with 1 error during collection, so no tests executed.",
+            "evidence_ids": [
+              "E4"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 6,
+        "llm_calls": 7,
+        "cost_usd": 0.00249991,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": null,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.0025
+      }
+    },
+    {
+      "scenario": "py-null-reference",
+      "language": "Python",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "app/config.py"
+        ],
+        "leading_file": "app/config.py",
+        "leading_symbol": "get_timeout",
+        "root_cause": "In app/config.py, get_timeout calls config.get(\"network\") without a default. When the config has no \"network\" key, this returns None, and the chained .get(\"timeout\", DEFAULT_TIMEOUT) raises AttributeError. The fallback for timeout only applies to the inner lookup, so it never runs when the section itself is missing.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: In app/config.py get_timeout, config.get(\"network\") is called without a default, so a missing \"network\" key yields None; chaining .get(\"timeout\", DEFAULT_TIMEOUT) on that None raises AttributeError. The fix is to fetch with a default (e.g. config.get(\"network\", {})) or guard for None before the chained call.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H2 supported: The \"network\" section may be present but explicitly set to null in the config file, which also yields None from config.get(\"network\") and triggers the same AttributeError; the fallback logic does not treat a None section as absent.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: In app/config.py get_timeout, config.get(\"network\") is called without a default, so a missing \"network\" key yields None; chaining .get(\"timeout\", DEFAULT_TIMEOUT) on that None raises AttributeError. The fix is to fetch with a default (e.g. config.get(\"network\", {})) or guard for None before the chained call.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: In app/config.py, get_timeout calls config.get(\"network\") without a default. When the config has no \"network\" key, this returns None, and the chained .get(\"timeout\", DEFAULT_TIMEOUT) raises AttributeError. The fallback for timeout only applies to the inner lookup, so it never runs when the section itself is missing.",
+            "evidence_ids": [
+              "E1"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: The existing suite passed (E3) and did not cover this case. A minimal repro calls get_timeout({}) with no \"network\" key. It raises AttributeError: 'NoneType' object has no attribute 'get' at app/config.py line 8, matching the report's traceback. It exits non-zero, so the bug is confirmed. Cause: config.get(\"network\") has no default, so it returns None and the chained .get(\"timeout\", ...) fails.",
+            "evidence_ids": [
+              "E3",
+              "E4",
+              "E5"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 7,
+        "llm_calls": 10,
+        "cost_usd": 0.00341961,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00342
+      }
+    },
+    {
+      "scenario": "ts-async-exception",
+      "language": "TypeScript",
+      "outputs": {
+        "outcome": "stopped",
+        "files": [
+          "src/importer.ts"
+        ],
+        "leading_file": "src/importer.ts",
+        "leading_symbol": "importBatch",
+        "root_cause": "(unverified) In src/importer.ts the batch loop calls the save function without await or Promise.all/allSettled, so rejected save promises are not collected; the result object is built before the saves settle, hardcoding ok: true and imported as the batch size, and the rejection escapes as unhandled.",
+        "reproduced": true,
+        "verified": null,
+        "hidden_tests_passed": null,
+        "claims": [
+          {
+            "claim": "H1 supported: In src/importer.ts the batch loop calls the save function without await or Promise.all/allSettled, so rejected save promises are not collected; the result object is built before the saves settle, hardcoding ok: true and imported as the batch size, and the rejection escapes as unhandled.",
+            "evidence_ids": [
+              "E2",
+              "E3"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: In src/importer.ts the batch loop calls the save function without await or Promise.all/allSettled, so rejected save promises are not collected; the result object is built before the saves settle, hardcoding ok: true and imported as the batch size, and the rejection escapes as unhandled.",
+            "evidence_ids": [
+              "E2",
+              "E3"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H4 supported: src/importer.ts::importBatch maps records with records.map((r) => save(r)) without awaiting the promises (no await, Promise.all or allSettled), so the try/catch is bypassed and the returned object { ok: true, imported: records.length } is built before any save settles; the rejected save promises are unhandled, producing the 'duplicate key' unhandled rejection. Fix: await Promise.allSettled(records.map(save)), count fulfilled vs rejected, and set ok to false when any rejected.",
+            "evidence_ids": [
+              "E8"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: In src/importer.ts the batch loop calls the save function without await or Promise.all/allSettled, so rejected save promises are not collected; the result object is built before the saves settle, hardcoding ok: true and imported as the batch size, and the rejection escapes as unhandled.",
+            "evidence_ids": [
+              "E2",
+              "E3"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: Extracted importBatch from src/importer.ts and ran it with 250 records where save rejects for one record. It returned { ok: true, imported: 250 } and the rejection surfaced as an unhandled 'duplicate key' rejection. Cause: src/importer.ts line 10 calls records.map((r) => save(r)) without await/Promise.all, so the try/catch never sees the rejections and line 11 returns ok: true before the saves settle.",
+            "evidence_ids": [
+              "E10",
+              "E11"
+            ],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 2,
+        "fix_attempts": 0,
+        "evidence_items": 11,
+        "llm_calls": 23,
+        "cost_usd": 0.00754738,
+        "halt_reason": "propose_fix: propose_fix: no valid FixProposal after 3 tool steps"
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 0.0,
+        "tests_pass_after_fix": 0.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00755
+      }
+    },
+    {
+      "scenario": "cs-regression",
+      "language": "C#",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "src/Finance/Money.cs"
+        ],
+        "leading_file": "src/Finance/Money.cs",
+        "leading_symbol": "Round",
+        "root_cause": "Money.ToCents calls Math.Round(amount, 2) with no MidpointRounding argument, so it uses the default MidpointRounding.ToEven. Midpoint values such as 2.345 round to the even neighbour (2.34) instead of away from zero (2.35), which violates finance policy FIN-12. The v3.0 change that introduced Math.Round dropped the required mode.",
+        "reproduced": false,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: Money.cs rounding uses Math.Round or decimal.Round without an explicit MidpointRounding.AwayFromZero argument, so it falls back to the default MidpointRounding.ToEven; 2.345 then rounds to 2.34 (even) instead of 2.35.",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: Money.cs rounding uses Math.Round or decimal.Round without an explicit MidpointRounding.AwayFromZero argument, so it falls back to the default MidpointRounding.ToEven; 2.345 then rounds to 2.34 (even) instead of 2.35.",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H4 supported: src/Finance/Money.cs Money.ToCents calls Math.Round(amount, 2) without MidpointRounding.AwayFromZero, so the default MidpointRounding.ToEven applies; 2.345 rounds to 2.34 instead of 2.35. The v3.0 change from hand-written rounding to Math.Round introduced this regression, contrary to the FIN-12 policy in the doc comment.",
+            "evidence_ids": [
+              "E7",
+              "E9"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: Money.cs rounding uses Math.Round or decimal.Round without an explicit MidpointRounding.AwayFromZero argument, so it falls back to the default MidpointRounding.ToEven; 2.345 then rounds to 2.34 (even) instead of 2.35.",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "root cause: Money.ToCents calls Math.Round(amount, 2) with no MidpointRounding argument, so it uses the default MidpointRounding.ToEven. Midpoint values such as 2.345 round to the even neighbour (2.34) instead of away from zero (2.35), which violates finance policy FIN-12. The v3.0 change that introduced Math.Round dropped the required mode.",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 2,
+        "fix_attempts": 1,
+        "evidence_items": 14,
+        "llm_calls": 16,
+        "cost_usd": 0.00600508,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 0.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.0,
+        "cost_usd": 0.00601
+      }
+    }
+  ]
+}

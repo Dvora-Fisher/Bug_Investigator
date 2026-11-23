@@ -1,0 +1,21 @@
+id: py-exception-handling
+language: Python
+category: exception-handling
+bug:
+  description: >
+    Customers who type a malformed amount (for example "12,5O") are charged 0 instead of getting a
+    validation error. parse_amount is documented to raise ValueError for invalid input.
+  error_output: ""
+expected:
+  file: billing/amounts.py
+  symbol: parse_amount
+  root_cause: A broad "except Exception" swallows the decimal.InvalidOperation error and returns Decimal(0) instead of raising ValueError.
+  fix: Catch InvalidOperation and raise ValueError (do not return a silent default).
+reference_fix:
+  - path: billing/amounts.py
+    old: |2
+          except Exception:
+              return Decimal(0)
+    new: |2
+          except InvalidOperation as exc:
+              raise ValueError(f"invalid amount: {text!r}") from exc

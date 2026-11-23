@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from investigator.graph.nodes.investigation import ReproductionReport
-from investigator.graph.state import ReviewDecision
+from investigator.graph.state import FileEdit, ReviewDecision
 from investigator.runtimes.adapters import PYTHON
 from investigator.sandbox.executor import Executor
 from investigator.sandbox.workspace import Workspace, WorkspaceError
@@ -105,4 +105,13 @@ def test_repro_files_stay_in_their_folder(executor, name):
 def test_install_runs_once_per_workspace(executor):
     executor.install()
     executor.install()
-    assert len(executor._runner.calls) == 1
+    executor.run_tests()
+    assert [cmd.split()[0] for cmd, _ in executor._runner.calls] == ["sh", "python"]
+
+
+def test_changed_dependency_file_triggers_reinstall(executor):
+    executor.install()
+    executor._ws.apply([FileEdit(path="requirements.txt", old="pytest\n", new="pytest\nPyYAML\n")])
+    executor.run_tests()
+    installs = [net for cmd, net in executor._runner.calls if cmd.startswith("sh -c")]
+    assert installs == [True, True]

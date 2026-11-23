@@ -1,0 +1,23 @@
+id: py-null-reference
+language: Python
+category: null-reference
+bug:
+  description: >
+    The service crashes on startup when the config file has no "network" section.
+    It should fall back to the default timeout of 30 seconds.
+  error_output: |
+    Traceback (most recent call last):
+      File "/srv/app/main.py", line 14, in <module>
+        timeout = get_timeout(config)
+      File "/srv/app/config.py", line 8, in get_timeout
+        return int(config.get("network").get("timeout", DEFAULT_TIMEOUT))
+    AttributeError: 'NoneType' object has no attribute 'get'
+expected:
+  file: app/config.py
+  symbol: get_timeout
+  root_cause: config.get("network") returns None when the section is missing, and .get is then called on None.
+  fix: Use config.get("network") or {} (or an equivalent guard) before reading "timeout".
+reference_fix:
+  - path: app/config.py
+    old: config.get("network").get(
+    new: (config.get("network") or {}).get(

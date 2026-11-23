@@ -1,0 +1,17 @@
+id: cs-exception-handling
+language: C#
+category: exception-handling
+bug:
+  description: >
+    When the disk is full, exporting a report shows "Report saved" but no file is created.
+    Users only find out later that the report is missing. It should say "Export failed, please retry".
+  error_output: ""
+expected:
+  file: src/Reports/ReportExporter.cs
+  symbol: Export
+  root_cause: The catch block swallows the exception and execution falls through to "return true", so failures are reported as success.
+  fix: Return false from the catch block (catching the I/O related exceptions), so failures are reported.
+reference_fix:
+  - path: src/Reports/ReportExporter.cs
+    old: "// ignore"
+    new: "return false;"

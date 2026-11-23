@@ -1,0 +1,20 @@
+id: java-null-reference
+language: Java
+category: null-reference
+bug:
+  description: >
+    Adding a brand-new product (never stocked) to the cart returns HTTP 500 instead of "out of stock".
+  error_output: |
+    java.lang.NullPointerException: Cannot invoke "java.lang.Integer.intValue()" because the return value
+    of "java.util.Map.get(Object)" is null
+        at shop.Inventory.available(Inventory.java:15)
+        at shop.Inventory.canFulfil(Inventory.java:19)
+expected:
+  file: src/main/java/shop/Inventory.java
+  symbol: available
+  root_cause: stock.get(sku) returns null for an unknown SKU, and auto-unboxing that null Integer to int throws NullPointerException.
+  fix: Return stock.getOrDefault(sku, 0).
+reference_fix:
+  - path: src/main/java/shop/Inventory.java
+    old: "return stock.get(sku);"
+    new: "return stock.getOrDefault(sku, 0);"

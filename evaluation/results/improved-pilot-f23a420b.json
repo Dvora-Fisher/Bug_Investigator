@@ -1,0 +1,325 @@
+{
+  "experiment": "improved-pilot-f23a420b",
+  "mode": "improved",
+  "finished_at": "2026-11-23T17:53:31.898470+00:00",
+  "scenarios": 4,
+  "total_spend_usd": 0.0155,
+  "summary": {
+    "bug_reproduced": 1.0,
+    "cost_usd": 0.0038,
+    "file_localization": 1.0,
+    "fix_success": 1.0,
+    "function_localization": 1.0,
+    "root_cause_accuracy": 1.0,
+    "tests_pass_after_fix": 1.0,
+    "unsupported_claim_rate": 0.2458
+  },
+  "rows": [
+    {
+      "scenario": "go-off-by-one",
+      "language": "Go",
+      "outputs": {
+        "outcome": "fixed_unverified",
+        "files": [
+          "window/last.go"
+        ],
+        "leading_file": "window/last.go",
+        "leading_symbol": "LastN",
+        "root_cause": "In window/last.go, LastN computes the slice start as len(xs)-n-1, which is one index too early. For xs=[1 2 3 4 5], n=2 this yields xs[2:] = [3 4 5] (n+1 elements) instead of xs[3:] = [4 5].",
+        "reproduced": false,
+        "verified": null,
+        "hidden_tests_passed": null,
+        "claims": [
+          {
+            "claim": "H1 supported: In LastN in window/last.go the start index is computed as len(xs)-n-1 (or equivalent off-by-one, e.g. using > instead of >= in a bounds check), so the returned slice begins one element too early and includes n+1 items.",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: In LastN in window/last.go the start index is computed as len(xs)-n-1 (or equivalent off-by-one, e.g. using > instead of >= in a bounds check), so the returned slice begins one element too early and includes n+1 items.",
+            "evidence_ids": [],
+            "supported": false,
+            "reason": "no evidence cited"
+          },
+          {
+            "claim": "root cause: In window/last.go, LastN computes the slice start as len(xs)-n-1, which is one index too early. For xs=[1 2 3 4 5], n=2 this yields xs[2:] = [3 4 5] (n+1 elements) instead of xs[3:] = [4 5].",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 2,
+        "llm_calls": 5,
+        "cost_usd": 0.00157529,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": null,
+        "fix_success": null,
+        "tests_pass_after_fix": null,
+        "unsupported_claim_rate": 0.3333333333333333,
+        "cost_usd": 0.00158
+      }
+    },
+    {
+      "scenario": "py-sql",
+      "language": "Python",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "shop/orders.py"
+        ],
+        "leading_file": "shop/orders.py",
+        "leading_symbol": "orders_for",
+        "root_cause": "orders_for interpolates the customer name directly into the SQL string with an f-string (line 20: WHERE customer = '{customer}'). An apostrophe in the name, such as O'Brien, terminates the SQL string literal early, so the rest of the name becomes bare SQL and SQLite raises a syntax error.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: In shop/orders.py, orders_for builds the query with an f-string that inserts the raw customer name between single quotes (WHERE customer = '{customer}'). For O'Brien the literal terminates at the apostrophe, leaving Brien as bare SQL, which produces exactly 'near \"Brien\": syntax error'. Fix: use a parameterized query, conn.execute(\"SELECT id, total FROM orders WHERE customer = ? ORDER BY id\", (customer,)).",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: In shop/orders.py, orders_for builds the query with an f-string that inserts the raw customer name between single quotes (WHERE customer = '{customer}'). For O'Brien the literal terminates at the apostrophe, leaving Brien as bare SQL, which produces exactly 'near \"Brien\": syntax error'. Fix: use a parameterized query, conn.execute(\"SELECT id, total FROM orders WHERE customer = ? ORDER BY id\", (customer,)).",
+            "evidence_ids": [],
+            "supported": false,
+            "reason": "no evidence cited"
+          },
+          {
+            "claim": "root cause: orders_for interpolates the customer name directly into the SQL string with an f-string (line 20: WHERE customer = '{customer}'). An apostrophe in the name, such as O'Brien, terminates the SQL string literal early, so the rest of the name becomes bare SQL and SQLite raises a syntax error.",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: Repro script calls orders_for(conn, \"O'Brien\") after inserting an O'Brien order. It fails with sqlite3.OperationalError: near \"Brien\": syntax error at shop/orders.py line 21, the f-string query at line 20 interpolating the raw name. The existing suite passed (E3) because it does not cover apostrophe names.",
+            "evidence_ids": [
+              "E3",
+              "E4",
+              "E5"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 7,
+        "llm_calls": 8,
+        "cost_usd": 0.0027069000000000004,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.2,
+        "cost_usd": 0.00271
+      }
+    },
+    {
+      "scenario": "ts-async-exception",
+      "language": "TypeScript",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "src/importer.ts"
+        ],
+        "leading_file": "src/importer.ts",
+        "leading_symbol": "importBatch",
+        "root_cause": "In importBatch, `records.map((r) => save(r))` starts every save but never awaits the returned promises. The try/catch cannot see asynchronous rejections, so the function returns `{ ok: true, imported: records.length }` immediately, and each rejected save becomes an unhandled promise rejection (\"duplicate key\").",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: The batch loop in src/importer.ts fires save() calls without awaiting or collecting them (e.g. forEach with async callback or un-awaited promises), so rejections are not caught and the result object is built before failures occur, always setting ok: true and counting imported without checking outcomes.",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: The batch loop in src/importer.ts fires save() calls without awaiting or collecting them (e.g. forEach with async callback or un-awaited promises), so rejections are not caught and the result object is built before failures occur, always setting ok: true and counting imported without checking outcomes.",
+            "evidence_ids": [],
+            "supported": false,
+            "reason": "no evidence cited"
+          },
+          {
+            "claim": "H4 supported: src/importer.ts::importBatch uses records.map((r) => save(r)) without await or Promise.all, so the save promises are discarded; the try/catch cannot catch their rejections, and the function returns { ok: true, imported: records.length } before any save settles. The 'duplicate key' rejection therefore escapes as an unhandled promise rejection while ok stays true.",
+            "evidence_ids": [
+              "E7"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H6 supported: The ok and imported fields are computed from records.length instead of counting successful saves, so even after awaiting, imported would be wrong unless the result is built from settled outcomes (e.g. Promise.allSettled counting fulfilled vs rejected).",
+            "evidence_ids": [
+              "E7"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: The batch loop in src/importer.ts fires save() calls without awaiting or collecting them (e.g. forEach with async callback or un-awaited promises), so rejections are not caught and the result object is built before failures occur, always setting ok: true and counting imported without checking outcomes.",
+            "evidence_ids": [],
+            "supported": false,
+            "reason": "no evidence cited"
+          },
+          {
+            "claim": "root cause: In importBatch, `records.map((r) => save(r))` starts every save but never awaits the returned promises. The try/catch cannot see asynchronous rejections, so the function returns `{ ok: true, imported: records.length }` immediately, and each rejected save becomes an unhandled promise rejection (\"duplicate key\").",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: Wrote .investigator/repro/repro.mjs, which calls importBatch with 4 records where the save for record 2 rejects with \"duplicate key\". Run output: an unhandled rejection \"duplicate key\" is logged, and the result is {\"ok\":true,\"imported\":4}. The script exits 1 with \"expected ok:false\". Cause, from src/importer.ts line 10: records.map((r) => save(r)) discards the promises without awaiting them, so the try/catch never sees the rejection and the function always returns ok: true with imported = records.length.",
+            "evidence_ids": [
+              "E13",
+              "E10"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 2,
+        "fix_attempts": 1,
+        "evidence_items": 15,
+        "llm_calls": 20,
+        "cost_usd": 0.00633876,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.25,
+        "cost_usd": 0.00634
+      }
+    },
+    {
+      "scenario": "cs-null-reference",
+      "language": "C#",
+      "outputs": {
+        "outcome": "fixed_and_verified",
+        "files": [
+          "src/Crm/CustomerService.cs"
+        ],
+        "leading_file": "src/Crm/CustomerService.cs",
+        "leading_symbol": "CustomerService.DisplayName",
+        "root_cause": "CustomerService.DisplayName dereferences the result of repository.Find(id) with the null-forgiving operator (!). The repository contract says Find returns null for unknown ids (E1, lines 7-8). For customers deleted from the CRM the result is null, so .Name throws NullReferenceException. The UnknownCustomer fallback (E1, line 13) is never reached.",
+        "reproduced": true,
+        "verified": true,
+        "hidden_tests_passed": true,
+        "claims": [
+          {
+            "claim": "H1 supported: CustomerService.DisplayName dereferences the nullable result of repository.Find(id) using the null-forgiving operator '!' with no null check, so for deleted customers (Find returns null) it throws NullReferenceException instead of returning UnknownCustomer. The fix is to use a null-conditional/fallback such as repository.Find(id)?.Name.Trim() ?? UnknownCustomer.",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "H1 supported: CustomerService.DisplayName dereferences the nullable result of repository.Find(id) using the null-forgiving operator '!' with no null check, so for deleted customers (Find returns null) it throws NullReferenceException instead of returning UnknownCustomer. The fix is to use a null-conditional/fallback such as repository.Find(id)?.Name.Trim() ?? UnknownCustomer.",
+            "evidence_ids": [],
+            "supported": false,
+            "reason": "no evidence cited"
+          },
+          {
+            "claim": "root cause: CustomerService.DisplayName dereferences the result of repository.Find(id) with the null-forgiving operator (!). The repository contract says Find returns null for unknown ids (E1, lines 7-8). For customers deleted from the CRM the result is null, so .Name throws NullReferenceException. The UnknownCustomer fallback (E1, line 13) is never reached.",
+            "evidence_ids": [
+              "E1",
+              "E2"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "reproduced: The existing suite passes (E3) but only covers an existing customer (E6), so it does not exercise the bug. I wrote a standalone repro that calls CustomerService.DisplayName(42) with a repository whose Find returns null (a deleted customer). It throws NullReferenceException instead of returning \"Unknown customer\" and exits 1 (E7). The cause is at src/Crm/CustomerService.cs line 16 (E4): `repository.Find(id)!.Name.Trim()` suppresses the null check, so the UnknownCustomer fallback is never reached.",
+            "evidence_ids": [
+              "E3",
+              "E4",
+              "E6",
+              "E7"
+            ],
+            "supported": true,
+            "reason": "ok"
+          },
+          {
+            "claim": "fix verified",
+            "evidence_ids": [],
+            "supported": true,
+            "reason": "ok"
+          }
+        ],
+        "hypothesis_rounds": 1,
+        "fix_attempts": 1,
+        "evidence_items": 9,
+        "llm_calls": 13,
+        "cost_usd": 0.00443718,
+        "halt_reason": ""
+      },
+      "error": null,
+      "scores": {
+        "file_localization": 1.0,
+        "function_localization": 1.0,
+        "root_cause_accuracy": 1.0,
+        "bug_reproduced": 1.0,
+        "fix_success": 1.0,
+        "tests_pass_after_fix": 1.0,
+        "unsupported_claim_rate": 0.2,
+        "cost_usd": 0.00444
+      }
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/Analytics/Analytics.csproj" />
+  <Project Path="tests/Analytics.Tests/Analytics.Tests.csproj" />
+</Solution>

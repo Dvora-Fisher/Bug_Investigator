@@ -14,3 +14,8 @@ expected:
   file: src/users.ts
   symbol: displayName
   root_cause: displayName dereferences user.profile with a non-null assertion, but profile is optional; it must use optional chaining (user.profile?.nickname).
+  fix: Read the nickname with user.profile?.nickname (or guard against a missing profile).
+reference_fix:
+  - path: src/users.ts
+    old: "user.profile!.nickname"
+    new: "user.profile?.nickname"

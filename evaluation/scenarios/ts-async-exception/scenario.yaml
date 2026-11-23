@@ -1,0 +1,22 @@
+id: ts-async-exception
+language: TypeScript
+category: exception-handling
+bug:
+  description: >
+    The nightly import reports "ok: true" even when records fail to save, and afterwards the process logs
+    an unhandled promise rejection ("duplicate key"). Failed imports should be reported as ok: false.
+  error_output: |
+    [import] batch 17: { ok: true, imported: 250 }
+    node:internal/process/promises:394
+        triggerUncaughtException(err, true /* fromPromise */);
+    Error: duplicate key
+        at save (/app/src/jobs/nightly.ts:41:13)
+expected:
+  file: src/importer.ts
+  symbol: importBatch
+  root_cause: importBatch starts the async saves with records.map(...) but never awaits them, so the try/catch cannot catch their rejections and success is reported before the saves finish.
+  fix: await Promise.all(records.map(save)) inside the try block.
+reference_fix:
+  - path: src/importer.ts
+    old: "    records.map((r) => save(r));\n"
+    new: "    await Promise.all(records.map((r) => save(r)));\n"

@@ -69,6 +69,8 @@ def test_full_run_pauses_for_review_and_finishes_after_approval(make_service, sa
     assert report.verified_facts and report.verified_facts[0].evidence_ids == ["E1"]
     assert any("NOT verified" in n for n in report.notes)
     assert state["referenced_files"] == ["stats/moving.py"]  # found from the stack trace
+    challenge = state["findings"][-1]
+    assert challenge.note.startswith("Challenge:") and challenge.evidence_ids == ["E1"]  # cites what it reviewed
     assert reasoner.calls == ["generate_hypotheses", "collect_evidence", "challenge_hypothesis", "propose_fix"]
 
 

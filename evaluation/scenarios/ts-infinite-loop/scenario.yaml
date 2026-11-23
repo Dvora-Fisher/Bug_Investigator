@@ -1,0 +1,32 @@
+id: ts-infinite-loop
+language: TypeScript
+category: infinite-loop
+bug:
+  description: >
+    Exporting a customer list that spans more than one page never finishes: memory grows until the
+    process is killed. Small lists (one page) export fine.
+  error_output: |
+    <--- Last few GCs --->
+    FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
+expected:
+  file: src/paging.ts
+  symbol: fetchAll
+  root_cause: The cursor is a const that is never updated from page.next, so the loop keeps requesting the first page forever.
+  fix: Make cursor mutable and set cursor = page.next after each page.
+reference_fix:
+  - path: src/paging.ts
+    old: |2
+        const cursor: string | null = null;
+        let page: Page<T>;
+        do {
+          page = await getPage(cursor);
+          items.push(...page.items);
+        } while (page.next !== null);
+    new: |2
+        let cursor: string | null = null;
+        let page: Page<T>;
+        do {
+          page = await getPage(cursor);
+          items.push(...page.items);
+          cursor = page.next;
+        } while (page.next !== null);

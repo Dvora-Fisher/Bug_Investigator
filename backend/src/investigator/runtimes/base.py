@@ -34,6 +34,7 @@ class RuntimeAdapter:
     name: str
     languages: tuple[str, ...]
     markers: tuple[str, ...]  # glob patterns; any match means "this adapter applies"
+    manifests: tuple[str, ...]  # dependency files; when they change, dependencies are reinstalled
     base_image: str
     install_cmd: tuple[str, ...]  # fixed command, runs WITH network (downloads dependencies)
     test_cmd: tuple[str, ...]  # runs WITHOUT network

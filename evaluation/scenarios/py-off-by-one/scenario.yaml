@@ -12,3 +12,8 @@ expected:
   file: stats/moving.py
   symbol: moving_average
   root_cause: The loop uses range(len(values) - window), which stops one window early; it must be range(len(values) - window + 1).
+  fix: Iterate over range(len(values) - window + 1).
+reference_fix:
+  - path: stats/moving.py
+    old: "range(len(values) - window)"
+    new: "range(len(values) - window + 1)"

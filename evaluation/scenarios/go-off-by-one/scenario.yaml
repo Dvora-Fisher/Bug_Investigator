@@ -1,0 +1,18 @@
+id: go-off-by-one
+language: Go
+category: off-by-one
+bug:
+  description: >
+    The "recent activity" feed should show the last N events, but it always shows N+1 events.
+  error_output: |
+    --- FAIL: TestLastN (0.00s)
+        last_test.go:11: LastN = [3 4 5], want [4 5]
+expected:
+  file: window/last.go
+  symbol: LastN
+  root_cause: The slice starts at len(xs)-n-1 instead of len(xs)-n, so one extra element is included.
+  fix: Return xs[len(xs)-n:].
+reference_fix:
+  - path: window/last.go
+    old: "xs[len(xs)-n-1:]"
+    new: "xs[len(xs)-n:]"

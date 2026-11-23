@@ -10,3 +10,8 @@ expected:
   file: src/Billing/InvoiceCalculator.cs
   symbol: Total
   root_cause: The discount condition uses "subtotal > DiscountThreshold"; the policy is "100 or more", so it must be ">=".
+  fix: Use subtotal >= DiscountThreshold.
+reference_fix:
+  - path: src/Billing/InvoiceCalculator.cs
+    old: "subtotal > DiscountThreshold"
+    new: "subtotal >= DiscountThreshold"

@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-import shutil
+import os
+
+# Unit tests must never send traces to LangSmith, whatever .env says (set before .env is loaded).
+os.environ["LANGSMITH_TRACING"] = "false"
+
+import shutil  # noqa: E402
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path

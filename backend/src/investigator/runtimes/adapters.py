@@ -19,6 +19,7 @@ PYTHON = RuntimeAdapter(
     name="python",
     languages=("Python",),
     markers=("pyproject.toml", "requirements*.txt", "setup.py", "pytest.ini", "test_*.py"),
+    manifests=("requirements.txt",),
     base_image="python:3.12-slim",
     image_setup="pip install --no-cache-dir pytest",
     # Only requirements.txt is installed, and only as pre-built wheels: building a package from
@@ -35,6 +36,7 @@ DOTNET = RuntimeAdapter(
     name="dotnet",
     languages=("C#",),
     markers=("*.csproj", "*.sln", "*.slnx"),
+    manifests=("*.csproj", "Directory.Packages.props", "packages.lock.json"),
     base_image="mcr.microsoft.com/dotnet/sdk:10.0",
     install_cmd=("dotnet", "restore"),
     test_cmd=("dotnet", "test", "--no-restore", "--nologo"),  # default verbosity keeps assertion messages
@@ -48,6 +50,7 @@ NODE = RuntimeAdapter(
     name="node",
     languages=("JavaScript", "TypeScript"),
     markers=("package.json",),
+    manifests=("package.json", "package-lock.json"),
     base_image="node:22-slim",
     # --ignore-scripts: package install scripts never run.
     install_cmd=("sh", "-c", "if [ -f package-lock.json ]; then npm ci --ignore-scripts --no-audit --no-fund; "

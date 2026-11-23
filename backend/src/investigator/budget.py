@@ -95,6 +95,9 @@ class UsageLedger:
     def thread_tokens(self, thread_id: str) -> int:
         return int(self._scalar("SELECT SUM(total_tokens) FROM usage WHERE thread_id = ?", thread_id))
 
+    def thread_calls(self, thread_id: str) -> int:
+        return int(self._scalar("SELECT COUNT(*) FROM usage WHERE thread_id = ?", thread_id))
+
     def thread_cost_usd(self, thread_id: str) -> float:
         return self._scalar("SELECT SUM(cost_usd) FROM usage WHERE thread_id = ?", thread_id)
 

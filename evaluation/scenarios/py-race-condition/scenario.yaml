@@ -1,0 +1,24 @@
+id: py-race-condition
+language: Python
+category: race-condition
+bug:
+  description: >
+    The analytics dashboard under-reports page hits under load. With 8 worker threads and 2000 real
+    hits we record only a few hundred. With a single thread the count is always right.
+  error_output: ""
+expected:
+  file: metrics/counter.py
+  symbol: HitCounter.hit
+  root_cause: hit() reads self.value and writes value + 1 without holding the lock, so concurrent threads overwrite each other's updates (lost updates).
+  fix: Hold self._lock around the read-modify-write in hit().
+reference_fix:
+  - path: metrics/counter.py
+    old: |2
+              current = self.value
+              time.sleep(0)  # simulates work between reading and writing (e.g. logging)
+              self.value = current + 1
+    new: |2
+              with self._lock:
+                  current = self.value
+                  time.sleep(0)  # simulates work between reading and writing (e.g. logging)
+                  self.value = current + 1

@@ -1,0 +1,17 @@
+id: js-logic-sort
+language: JavaScript
+category: logic-error
+bug:
+  description: >
+    The leaderboard puts a player with 9 points above a player with 100 points.
+    It looks right as long as all scores have the same number of digits.
+  error_output: ""
+expected:
+  file: src/leaderboard.js
+  symbol: topScores
+  root_cause: Array.prototype.sort() without a comparator compares values as strings, so "9" sorts after "100".
+  fix: Sort numerically, e.g. .sort((a, b) => b - a), and drop the reverse().
+reference_fix:
+  - path: src/leaderboard.js
+    old: "[...scores].sort().reverse().slice(0, n)"
+    new: "[...scores].sort((a, b) => b - a).slice(0, n)"

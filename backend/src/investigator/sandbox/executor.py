@@ -3,9 +3,11 @@ allow-listed commands (without network). Combines the adapter (what to run) with
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections.abc import Sequence
+from fnmatch import fnmatch
 from typing import Protocol
 
 from ..config import Settings
@@ -32,16 +34,28 @@ class Executor:
         self._marker = ws.private_dir / "install.json"
 
     def install(self) -> ExecResult:
-        """Install dependencies once per workspace; later calls return the stored result."""
+        """Install dependencies; reuse the previous install while the dependency files are unchanged
+        (a fix that edits e.g. requirements.txt triggers a fresh install)."""
+        fingerprint = self._manifest_fingerprint()
         if self._marker.exists():
-            return ExecResult(**json.loads(self._marker.read_text(encoding="utf-8")))
+            saved = json.loads(self._marker.read_text(encoding="utf-8"))
+            if saved.pop("fingerprint", None) == fingerprint:
+                return ExecResult(**saved)
         result = self._run(self._adapter.install_cmd, network=True, timeout_s=self._s.sandbox_install_timeout_s)
         self._marker.parent.mkdir(parents=True, exist_ok=True)
-        self._marker.write_text(json.dumps(result.__dict__), encoding="utf-8")
+        self._marker.write_text(json.dumps({**result.__dict__, "fingerprint": fingerprint}), encoding="utf-8")
         return result
 
     def run_tests(self, test_filter: str = "") -> ExecResult:
+        self.install()  # no-op unless dependency files changed (e.g. by an applied fix)
         return self._run(self._adapter.test_command(test_filter))
+
+    def _manifest_fingerprint(self) -> str:
+        digest = hashlib.sha256()
+        for rel in self._ws.iter_files():
+            if any(fnmatch(rel.rsplit("/", 1)[-1], pattern) for pattern in self._adapter.manifests):
+                digest.update(rel.encode() + b"\0" + (self._ws.project / rel).read_bytes())
+        return digest.hexdigest()
 
     def run_command(self, argv: Sequence[str]) -> ExecResult:
         """Run an allow-listed program (no shell, no network). The LLM chooses only the arguments."""

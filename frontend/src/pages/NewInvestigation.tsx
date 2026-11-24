@@ -18,7 +18,7 @@ export default function NewInvestigation({ health }: { health: Health | null }) 
   const [githubRef, setGithubRef] = useState("");
   const [description, setDescription] = useState("");
   const [errorOutput, setErrorOutput] = useState("");
-  const [mode, setMode] = useState<Mode>("improved");
+  const [mode, setMode] = useState<Mode>("baseline");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
@@ -153,13 +153,13 @@ export default function NewInvestigation({ health }: { health: Health | null }) 
           <section className="card">
             <div className="card-head"><div><h2><span className="faint mono" style={{ marginRight: 8 }}>03</span>Mode</h2></div></div>
             <div className="card-body stack" style={{ gap: 10 }}>
-              <button type="button" className={`mode-card${mode === "improved" ? " on" : ""}`} onClick={() => setMode("improved")}>
-                <div className="row"><ShieldQuestion size={16} color="#c9b8ff" /><b>Thorough</b></div>
-                <div className="small muted">Double-checks every conclusion.</div>
-              </button>
               <button type="button" className={`mode-card${mode === "baseline" ? " on" : ""}`} onClick={() => setMode("baseline")}>
                 <div className="row"><Zap size={16} color="#8fb2ff" /><b>Fast</b></div>
-                <div className="small muted">Quicker and cheaper.</div>
+                <div className="small muted">Recommended for most bugs. Quick and low-cost.</div>
+              </button>
+              <button type="button" className={`mode-card${mode === "improved" ? " on" : ""}`} onClick={() => setMode("improved")}>
+                <div className="row"><ShieldQuestion size={16} color="#c9b8ff" /><b>Thorough</b></div>
+                <div className="small muted">For complex projects and hard bugs. Challenges every hypothesis before fixing; slower and costs more.</div>
               </button>
             </div>
           </section>

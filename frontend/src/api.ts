@@ -142,8 +142,24 @@ export class ApiError extends Error {
   }
 }
 
+// Where the API lives. Empty in development (Vite proxies /api); set VITE_API_BASE at build time when
+// the frontend is hosted apart from the backend, e.g. https://<codespace>-8000.app.github.dev
+const API_BASE = ((import.meta.env.VITE_API_BASE as string | undefined) ?? "").replace(/\/+$/, "");
+const PASSWORD_KEY = "bug-investigator.password";
+
+/** The access password the backend asks for when APP_PASSWORD is set (kept in this browser only). */
+export function getPassword(): string {
+  try { return localStorage.getItem(PASSWORD_KEY) ?? ""; } catch { return ""; }
+}
+export function setPassword(value: string) {
+  try { localStorage.setItem(PASSWORD_KEY, value); } catch { /* storage blocked: asks again next visit */ }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, init);
+  const headers = new Headers(init?.headers);
+  const password = getPassword();
+  if (password) headers.set("X-App-Password", password);
+  const res = await fetch(`${API_BASE}/api${path}`, { ...init, headers });
   if (!res.ok) {
     let message = res.statusText;
     try {
@@ -177,7 +193,9 @@ export const api = {
 
 /** Opens the server-sent event stream from `after`; calls onEvent for each event. Returns a close function. */
 export function streamEvents(id: string, after: number, onEvent: (e: RunEvent) => void, onEnd: () => void): () => void {
-  const source = new EventSource(`/api/investigations/${id}/events?after=${after}`);
+  // EventSource cannot send headers, so the password goes in the query string.
+  const key = getPassword();
+  const source = new EventSource(`${API_BASE}/api/investigations/${id}/events?after=${after}${key ? `&key=${encodeURIComponent(key)}` : ""}`);
   const handler = (msg: MessageEvent) => {
     // The browser's own connection "error" event shares our event name but carries no data.
     if (typeof msg.data !== "string") return;

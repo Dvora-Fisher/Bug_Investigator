@@ -1,0 +1,23 @@
+// GitHub Codespaces: runs the backend API with a real Docker daemon for the execution sandbox.
+// Secrets ANTHROPIC_API_KEY and APP_PASSWORD come from the user's Codespaces secrets.
+// After creating the codespace, make port 8000 public:  gh codespace ports visibility 8000:public -c <name>
+{
+  "name": "Bug Investigator API",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "hostRequirements": { "cpus": 2, "memory": "8gb" },
+  "secrets": {
+    "ANTHROPIC_API_KEY": { "description": "Anthropic API key used by the investigator" },
+    "APP_PASSWORD": { "description": "Password the web UI must send; protects the public API" }
+  },
+  "containerEnv": {
+    "CORS_ORIGIN_REGEX": "https://.*\\.onrender\\.com",
+    "PYTHONUNBUFFERED": "1"
+  },
+  "forwardPorts": [8000],
+  "portsAttributes": { "8000": { "label": "API", "onAutoForward": "silent" } },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postStartCommand": "bash .devcontainer/start-api.sh"
+}

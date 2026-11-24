@@ -71,6 +71,12 @@ class Settings(BaseSettings):
 
     # --- Web API ---
     cors_origins: list[str] = ["http://localhost:5173"]  # the Vite dev server of the frontend
+    # Extra allowed origins as a regular expression, e.g. https://.*\.onrender\.com for a hosted frontend.
+    cors_origin_regex: str | None = None
+    # When set, every /api request must carry this password (X-App-Password header, or ?key= for
+    # server-sent events, which cannot send headers). Required whenever the API is reachable from the
+    # internet: it runs uploaded code and spends the API budget. Empty = no check (local use).
+    app_password: str = ""
 
     # --- Storage ---
     data_dir: Path = ROOT_DIR / "data"

@@ -224,3 +224,20 @@ def test_docker_runner_reports_start_and_end(settings, tmp_path, monkeypatch):
     result = runner.run("img", ["npm", "test"], tmp_path, network=False, timeout_s=5)
     assert result.ok
     assert seen == [(tmp_path.resolve(), "start", None), (tmp_path.resolve(), "end", 0)]
+
+
+def test_app_password_guards_every_api_route(make_service, settings):
+    settings.app_password = "s3cret"
+    settings.cors_origin_regex = r"https://.*\.onrender\.com"
+    client = TestClient(create_app(make_service(happy_script())))
+    assert client.get("/api/health").status_code == 401
+    assert client.get("/api/health", headers={"X-App-Password": "wrong"}).status_code == 401
+    assert client.get("/api/health", headers={"X-App-Password": "s3cret"}).status_code == 200
+    assert client.get("/api/samples?key=s3cret").status_code == 200  # server-sent events use ?key=
+    # A preflight from the hosted frontend passes without the password, and a 401 still carries CORS headers.
+    origin = "https://bug-investigator-web.onrender.com"
+    pre = client.options("/api/health", headers={"Origin": origin, "Access-Control-Request-Method": "GET",
+                                                 "Access-Control-Request-Headers": "x-app-password"})
+    assert pre.status_code == 200 and pre.headers["access-control-allow-origin"] == origin
+    denied = client.get("/api/health", headers={"Origin": origin})
+    assert denied.status_code == 401 and denied.headers["access-control-allow-origin"] == origin

@@ -1,7 +1,7 @@
-import { BarChart3, Box, Cpu, Home as HomeIcon, LayoutDashboard, PlusCircle, Search, Wallet } from "lucide-react";
-import { useEffect, useState } from "react";
+import { BarChart3, Box, Cpu, Home as HomeIcon, LayoutDashboard, Lock, PlusCircle, Search, Wallet } from "lucide-react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
-import { api, Health } from "./api";
+import { api, ApiError, Health, setPassword } from "./api";
 import Evaluation from "./pages/Evaluation";
 import Home from "./pages/Home";
 import Investigation from "./pages/Investigation";
@@ -12,12 +12,17 @@ import { usd } from "./components/ui";
 export default function App() {
   const [health, setHealth] = useState<Health | null>(null);
   const [offline, setOffline] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const load = useCallback(() => api.health()
+    .then((h) => { setHealth(h); setOffline(false); setLocked(false); })
+    .catch((e) => { if (e instanceof ApiError && e.status === 401) setLocked(true); else setOffline(true); }), []);
   useEffect(() => {
-    const load = () => api.health().then((h) => { setHealth(h); setOffline(false); }).catch(() => setOffline(true));
     load();
     const t = setInterval(load, 20000);
     return () => clearInterval(t);
-  }, []);
+  }, [load]);
+
+  if (locked) return <PasswordGate onSubmit={(value) => { setPassword(value); load(); }} />;
 
   return (
     <div className="shell">
@@ -39,7 +44,7 @@ export default function App() {
 
         <div className="sidebar-foot">
           {offline ? (
-            <div className="callout callout-bad small" style={{ padding: "10px 12px" }}>API offline — start the backend on :8000</div>
+            <div className="callout callout-bad small" style={{ padding: "10px 12px" }}>{import.meta.env.VITE_API_BASE ? "Server is asleep — start the Codespace" : "API offline — start the backend on :8000"}</div>
           ) : (
             <>
               <div className="sys-row"><span className="row" style={{ gap: 7 }}><Cpu size={14} />Model</span><span className="mono tiny">{health?.model ?? "…"}</span></div>
@@ -68,6 +73,25 @@ export default function App() {
           <Route path="*" element={<div className="page"><h1>Not found</h1></div>} />
         </Routes>
       </main>
+    </div>
+  );
+}
+
+/** Shown when the backend requires a password (APP_PASSWORD) and this browser has none or a wrong one. */
+function PasswordGate({ onSubmit }: { onSubmit: (value: string) => void }) {
+  const [value, setValue] = useState("");
+  const [tried, setTried] = useState(false);
+  const submit = (e: FormEvent) => { e.preventDefault(); setTried(true); onSubmit(value); };
+  return (
+    <div className="shell" style={{ display: "grid", placeItems: "center", minHeight: "100vh", padding: 16 }}>
+      <div className="backdrop" />
+      <form className="card card-pad" onSubmit={submit} style={{ width: "min(380px, 100%)", display: "grid", gap: 16, position: "relative" }}>
+        <div className="row" style={{ gap: 10 }}><Lock size={18} /><strong>Bug Investigator</strong></div>
+        <label className="field"><span className="field-label">Access password</span>
+          <input className="input" type="password" autoFocus value={value} onChange={(e) => setValue(e.target.value)} /></label>
+        {tried && <div className="callout callout-bad small">Wrong password, try again.</div>}
+        <button className="btn btn-primary" type="submit" disabled={!value}>Enter</button>
+      </form>
     </div>
   );
 }

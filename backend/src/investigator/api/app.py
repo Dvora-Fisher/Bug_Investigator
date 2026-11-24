@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import hmac
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from ..config import get_settings
 from ..service import InvestigationService
@@ -18,7 +20,20 @@ def create_app(service: InvestigationService | None = None) -> FastAPI:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     app = FastAPI(title="Bug Investigator API", version="0.1.0")
     app.state.manager = RunManager(service or InvestigationService(settings))
-    app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_methods=["*"], allow_headers=["*"])
+    if settings.app_password:
+        password = settings.app_password.encode()
+
+        @app.middleware("http")
+        async def require_password(request: Request, call_next):
+            # Preflight requests carry no credentials; the CORS middleware (added after, so it runs first) answers them.
+            if request.url.path.startswith("/api") and request.method != "OPTIONS":
+                given = request.headers.get("x-app-password") or request.query_params.get("key") or ""
+                if not hmac.compare_digest(given.encode(), password):
+                    return JSONResponse({"detail": "Password required"}, status_code=401)
+            return await call_next(request)
+
+    app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins,
+                       allow_origin_regex=settings.cors_origin_regex, allow_methods=["*"], allow_headers=["*"])
     app.include_router(router)
     return app
 

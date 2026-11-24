@@ -26,7 +26,8 @@ def create_app(service: InvestigationService | None = None) -> FastAPI:
         @app.middleware("http")
         async def require_password(request: Request, call_next):
             # Preflight requests carry no credentials; the CORS middleware (added after, so it runs first) answers them.
-            if request.url.path.startswith("/api") and request.method != "OPTIONS":
+            if (request.url.path.startswith("/api") and request.url.path != "/api/ping"
+                    and request.method != "OPTIONS"):
                 given = request.headers.get("x-app-password") or request.query_params.get("key") or ""
                 if not hmac.compare_digest(given.encode(), password):
                     return JSONResponse({"detail": "Password required"}, status_code=401)

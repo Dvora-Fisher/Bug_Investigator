@@ -1,0 +1,39 @@
+# Checks the hosted deployment from outside the local network (useful behind filters like NetFree).
+# Run it from the Actions tab or: gh workflow run check-deploy.yml -f api=<codespace url> -f web=<render url>
+name: Check deployment
+on:
+  workflow_dispatch:
+    inputs:
+      api: { description: "API base URL (Codespaces port 8000)", required: true }
+      web: { description: "Frontend URL (Render)", required: true }
+permissions: {}
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: API is up and can run Docker
+        env: { API: "${{ inputs.api }}" }
+        run: |
+          for i in $(seq 1 20); do
+            curl -fsS "$API/api/ping" > ping.json && break
+            echo "waiting for API ($i)"; sleep 15
+          done
+          cat ping.json; echo
+          grep -q '"docker":true' ping.json
+      - name: API requires the password
+        env: { API: "${{ inputs.api }}" }
+        run: test "$(curl -s -o /dev/null -w '%{http_code}' "$API/api/health")" = 401
+      - name: Browser preflight from the frontend is allowed
+        env: { API: "${{ inputs.api }}", WEB: "${{ inputs.web }}" }
+        run: |
+          curl -sS -o /dev/null -D headers.txt -X OPTIONS "$API/api/health" \
+            -H "Origin: $WEB" -H "Access-Control-Request-Method: GET" -H "Access-Control-Request-Headers: x-app-password"
+          cat headers.txt
+          grep -qi "access-control-allow-origin: $WEB" headers.txt
+      - name: Frontend is served (including deep links)
+        env: { WEB: "${{ inputs.web }}" }
+        run: |
+          curl -fsS "$WEB/" | grep -q '<div id="root">'
+          curl -fsS "$WEB/new" | grep -q '<div id="root">'
+          js=$(curl -fsS "$WEB/" | grep -o 'assets/index-[^"]*\.js' | head -1)
+          curl -fsS "$WEB/$js" | grep -q "app.github.dev"

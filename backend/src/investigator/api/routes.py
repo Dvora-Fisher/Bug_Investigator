@@ -207,6 +207,14 @@ def list_experiments() -> list[Experiment]:
     return sorted(experiments, key=lambda e: e.finished_at)
 
 
+@router.get("/ping")
+def ping(runs: Manager) -> dict:
+    """Liveness check that needs no password (see app.py): is the server up, and can it run Docker?"""
+    runner = runs.service.runner
+    return {"ok": True, "docker": bool(runner and getattr(runner, "available", False)),
+            "sandbox_images": {a.name: bool(runner and runner.image_exists(a.image)) for a in ADAPTERS}}
+
+
 @router.get("/health", response_model=Health)
 def health(runs: Manager) -> Health:
     s = runs.service.settings

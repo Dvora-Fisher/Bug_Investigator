@@ -231,6 +231,7 @@ def test_app_password_guards_every_api_route(make_service, settings):
     settings.cors_origin_regex = r"https://.*\.onrender\.com"
     client = TestClient(create_app(make_service(happy_script())))
     assert client.get("/api/health").status_code == 401
+    assert client.get("/api/ping").json()["ok"] is True  # liveness check stays open
     assert client.get("/api/health", headers={"X-App-Password": "wrong"}).status_code == 401
     assert client.get("/api/health", headers={"X-App-Password": "s3cret"}).status_code == 200
     assert client.get("/api/samples?key=s3cret").status_code == 200  # server-sent events use ?key=
